@@ -1975,10 +1975,27 @@ function serveStaticFile(req, res, pathname) {
 const primaryServer = http.createServer((req, res) => {
   const url = new URL(req.url, `http://localhost:${WEB_PORT}`);
   const pathname = url.pathname;
+  const search = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
+
+  // Canonical Clean URLs: Redirect /home or /home/index.html straight to Root Birthday Site
+  if (pathname === '/home' || pathname === '/home/' || pathname === '/home/index.html') {
+    res.writeHead(301, { 'Location': `/${search}` });
+    return res.end();
+  }
+
+  // Canonical Clean URLs: Never expose /index.html in the URL bar
+  if (pathname === '/index.html') {
+    res.writeHead(301, { 'Location': `/${search}` });
+    return res.end();
+  }
+  if (pathname.endsWith('/index.html') && pathname !== '/admin/index.html') {
+    const cleanDir = pathname.slice(0, -10) || '/';
+    res.writeHead(301, { 'Location': `${cleanDir}/${search}`.replace(/\/+/g, '/') });
+    return res.end();
+  }
 
   // English Birthday Landing Page
   if (pathname === '/en/event/birthday') {
-    const search = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
     res.writeHead(301, { 'Location': `/en/event/birthday/${search}` });
     return res.end();
   }
