@@ -48,15 +48,131 @@ function saveLetters() {
   }
 }
 
-// --- YouPI-PG & UPI Payment Configuration ---
-const PRICE_INR = 99;
-const UPI_ID = 'dipraksh@pingpay';
-const UPI_ID_ALT = '9327792155@upi';
-const PAYEE_NAME = 'Luve gifts';
+// --- Settings, Vouchers & Multi-Gateway Configuration ---
+const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
+const VOUCHERS_FILE = path.join(DATA_DIR, 'vouchers.json');
+
+let settings = {
+  adminPasswordHash: '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9', // admin123
+  activeGateway: 'youpi',
+  defaultPrice: 99,
+  currency: 'INR',
+  youpi: {
+    enabled: true,
+    upiId: 'dipraksh@pingpay',
+    altUpiId: '9327792155@upi',
+    payeeName: 'Luve gifts',
+    price: 99
+  },
+  razorpay: {
+    enabled: false,
+    keyId: '',
+    keySecret: '',
+    price: 99
+  },
+  manualUpi: {
+    enabled: false,
+    upiId: 'dipraksh@pingpay',
+    payeeName: 'Luve gifts',
+    price: 99
+  },
+  freeMode: {
+    enabled: false
+  }
+};
+
+try {
+  if (fs.existsSync(SETTINGS_FILE)) {
+    settings = { ...settings, ...JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8')) };
+  } else {
+    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2), 'utf8');
+  }
+} catch (e) {
+  console.error('Failed to load settings:', e);
+}
+
+function saveSettings() {
+  try {
+    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2), 'utf8');
+  } catch (e) {
+    console.error('Failed to save settings:', e);
+  }
+}
+
+let vouchers = {};
+try {
+  if (fs.existsSync(VOUCHERS_FILE)) {
+    vouchers = JSON.parse(fs.readFileSync(VOUCHERS_FILE, 'utf8'));
+  } else {
+    vouchers = {
+      "FREEGIFT": {
+        "code": "FREEGIFT",
+        "type": "percent",
+        "value": 100,
+        "maxUses": 100,
+        "usedCount": 0,
+        "active": true,
+        "expiresAt": "2027-12-31T23:59:59.000Z",
+        "createdAt": new Date().toISOString(),
+        "note": "100% Free VIP pass"
+      },
+      "LUVE50": {
+        "code": "LUVE50",
+        "type": "flat",
+        "value": 50,
+        "maxUses": 50,
+        "usedCount": 0,
+        "active": true,
+        "expiresAt": "2027-12-31T23:59:59.000Z",
+        "createdAt": new Date().toISOString(),
+        "note": "Flat ₹50 discount"
+      }
+    };
+    fs.writeFileSync(VOUCHERS_FILE, JSON.stringify(vouchers, null, 2), 'utf8');
+  }
+} catch (e) {
+  vouchers = {};
+}
+
+function saveVouchers() {
+  try {
+    fs.writeFileSync(VOUCHERS_FILE, JSON.stringify(vouchers, null, 2), 'utf8');
+  } catch (e) {
+    console.error('Failed to save vouchers:', e);
+  }
+}
+
+let PRICE_INR = settings.defaultPrice || 99;
+let UPI_ID = settings.youpi?.upiId || 'dipraksh@pingpay';
+let UPI_ID_ALT = settings.youpi?.altUpiId || '9327792155@upi';
+let PAYEE_NAME = settings.youpi?.payeeName || 'Luve gifts';
 const MERCHANT_ID = '00000000-0000-0000-0000-000000000001';
 const YOUPI_API_PORT = 6100;
 const YOUPI_CHECKOUT_PORT = 7000;
 const YOUPI_ADMIN_TOKEN = '3cd4a37f974c67ea625777ca596b42903ef0bde5609aba5e687c8147a7a2f87e';
+
+function syncGlobalVars() {
+  PRICE_INR = settings.defaultPrice || 99;
+  UPI_ID = settings.youpi?.upiId || 'dipraksh@pingpay';
+  UPI_ID_ALT = settings.youpi?.altUpiId || '9327792155@upi';
+  PAYEE_NAME = settings.youpi?.payeeName || 'Luve gifts';
+}
+
+const adminSessions = new Map();
+
+function checkAdminAuth(req) {
+  const cookieHeader = req.headers.cookie || '';
+  const match = cookieHeader.match(/luve_admin_token=([^;]+)/);
+  const token = (match ? match[1] : null) || req.headers['x-admin-token'] || req.headers['authorization']?.replace(/^Bearer\s+/i, '');
+  if (!token) return false;
+  const sess = adminSessions.get(token);
+  if (!sess) return false;
+  if (Date.now() > sess.expiresAt) {
+    adminSessions.delete(token);
+    return false;
+  }
+  return true;
+}
 
 const paymentSessions = {};
 
@@ -181,6 +297,290 @@ function proxyToPort(req, res, targetPort, pathnameWithSearch) {
   });
 
   req.pipe(proxyReq);
+}
+
+function serveManualUpiCheckout(req, res, letterRef, hostUrl) {
+  const price = settings.defaultPrice || 99;
+  const upiId = settings.manualUpi?.upiId || settings.youpi?.upiId || 'dipraksh@pingpay';
+  const payee = settings.manualUpi?.payeeName || settings.youpi?.payeeName || 'Luve gifts';
+  const upiUri = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(payee)}&am=${price}.00&cu=INR&tn=${encodeURIComponent(letterRef || 'Luve-Gift')}`;
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UPI Checkout · ${payee}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin:0; padding:0; }
+    body {
+      background: #090d16;
+      background-image: radial-gradient(at 50% 0%, rgba(236,72,153,0.15) 0, transparent 60%);
+      color: #fff;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+    .pay-card {
+      background: rgba(18, 26, 43, 0.9);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 20px;
+      padding: 2.25rem;
+      max-width: 440px;
+      width: 100%;
+      box-shadow: 0 25px 50px rgba(0,0,0,0.6);
+      text-align: center;
+    }
+    .qr-box {
+      background: #fff;
+      padding: 1rem;
+      border-radius: 14px;
+      display: inline-block;
+      margin: 1.25rem 0;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+    }
+    .btn {
+      display: inline-block;
+      width: 100%;
+      padding: 0.8rem;
+      border-radius: 10px;
+      font-weight: 700;
+      cursor: pointer;
+      border: none;
+      font-size: 0.95rem;
+      transition: all 0.2s;
+    }
+    .btn-upi { background: linear-gradient(135deg, #10b981, #059669); color: #fff; text-decoration: none; margin-bottom: 0.75rem; }
+    .btn-submit { background: linear-gradient(135deg, #ec4899, #db2777); color: #fff; }
+    input {
+      width: 100%;
+      padding: 0.75rem;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.15);
+      background: rgba(0,0,0,0.3);
+      color: #fff;
+      margin-bottom: 0.75rem;
+      font-size: 0.95rem;
+      outline: none;
+    }
+    input:focus { border-color: #ec4899; }
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.65rem;
+      border-radius: 9999px;
+      background: rgba(236,72,153,0.15);
+      border: 1px solid rgba(236,72,153,0.3);
+      color: #f472b6;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      margin-bottom: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="pay-card">
+    <span class="badge">UPI Direct Gateway</span>
+    <h1 style="font-family:'Outfit',sans-serif; font-size:1.6rem; margin-bottom:0.25rem;">${payee}</h1>
+    <div style="font-size:2.2rem; font-weight:800; color:#34d399; font-family:'Outfit',sans-serif; margin:0.5rem 0;" id="displayAmount">₹${price}.00</div>
+    <p style="color:#94a3b8; font-size:0.85rem;">Scan this QR with any UPI App (GPay, PhonePe, Paytm, BHIM)</p>
+    
+    <div class="qr-box">
+      <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiUri)}" alt="UPI QR Code" width="180" height="180" style="display:block;" />
+    </div>
+
+    <div style="margin-bottom:1.25rem;">
+      <a href="${upiUri}" class="btn btn-upi">📲 Open UPI App on Phone</a>
+      <div style="font-size:0.8rem; color:#94a3b8;">Or copy UPI ID: <strong style="color:#fff; cursor:pointer;" onclick="navigator.clipboard.writeText('${upiId}'); alert('UPI ID copied: ${upiId}');">${upiId} 📋</strong></div>
+    </div>
+
+    <!-- Voucher box -->
+    <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:1rem; margin-bottom:1.25rem; text-align:left;">
+      <div style="font-size:0.8rem; font-weight:700; color:#cbd5e1; margin-bottom:0.4rem;">🎟️ Have a discount voucher?</div>
+      <div style="display:flex; gap:0.5rem;">
+        <input type="text" id="voucherCode" placeholder="Enter promo code" style="text-transform:uppercase; margin-bottom:0;" />
+        <button type="button" class="btn" style="width:auto; padding:0 1rem; background:#3b82f6; color:#fff;" onclick="applyVoucher()">Apply</button>
+      </div>
+      <div id="voucherMsg" style="font-size:0.75rem; margin-top:0.4rem; display:none;"></div>
+    </div>
+
+    <!-- UTR Form -->
+    <form onsubmit="submitUtr(event)" style="text-align:left;">
+      <label style="font-size:0.8rem; font-weight:700; color:#cbd5e1; display:block; margin-bottom:0.3rem;">Enter 12-Digit UTR / Bank Ref Number:</label>
+      <input type="text" id="utrNumber" placeholder="e.g. 429182749102" required maxlength="20" />
+      <button type="submit" class="btn btn-submit">Verify Payment & Unlock Gift ⚡</button>
+    </form>
+  </div>
+
+  <script>
+    const letterRef = "${letterRef}";
+    async function submitUtr(e) {
+      e.preventDefault();
+      const utr = document.getElementById('utrNumber').value.trim();
+      const btn = e.target.querySelector('button');
+      btn.textContent = 'Verifying...';
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/payments/verify-utr', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ utr, letterRef })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          alert('Payment confirmed! Your gift is unlocked.');
+          window.location.href = '/en/letter/' + encodeURIComponent(letterRef) + '?payment=success';
+        } else {
+          alert(data.error || 'Verification failed. Please check UTR number.');
+          btn.textContent = 'Verify Payment & Unlock Gift ⚡';
+          btn.disabled = false;
+        }
+      } catch (err) {
+        alert('Server connection error. Please try again.');
+        btn.textContent = 'Verify Payment & Unlock Gift ⚡';
+        btn.disabled = false;
+      }
+    }
+
+    async function applyVoucher() {
+      const code = document.getElementById('voucherCode').value.trim();
+      const msg = document.getElementById('voucherMsg');
+      if (!code) return;
+      try {
+        const res = await fetch('/api/voucher/apply', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code, letterRef })
+        });
+        const data = await res.json();
+        msg.style.display = 'block';
+        if (data.ok) {
+          msg.style.color = '#34d399';
+          msg.textContent = data.message;
+          document.getElementById('displayAmount').textContent = '₹' + data.finalPrice + '.00';
+          if (data.unlocked && data.redirectUrl) {
+            setTimeout(() => { window.location.href = data.redirectUrl; }, 800);
+          }
+        } else {
+          msg.style.color = '#f43f5e';
+          msg.textContent = data.error || 'Invalid code';
+        }
+      } catch (e) {
+        msg.style.display = 'block';
+        msg.style.color = '#f43f5e';
+        msg.textContent = 'Failed to apply voucher';
+      }
+    }
+  </script>
+</body>
+</html>`;
+
+  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+  res.end(html);
+}
+
+function serveRazorpayCheckout(req, res, letterRef, hostUrl) {
+  const price = settings.defaultPrice || 99;
+  const keyId = settings.razorpay?.keyId || 'rzp_test_placeholder';
+  const payee = settings.youpi?.payeeName || 'Luve gifts';
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Razorpay Checkout · ${payee}</title>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <style>
+    body { background: #090d16; color: #fff; font-family: sans-serif; display:flex; align-items:center; justify-content:center; min-height:100vh; margin:0; }
+    .card { background: #161f2e; border:1px solid rgba(255,255,255,0.1); border-radius:16px; padding:2rem; max-width:400px; width:100%; text-align:center; box-sizing:border-box; }
+    .btn { background: #ec4899; color:#fff; border:none; padding:0.8rem 1.5rem; font-size:1rem; border-radius:8px; cursor:pointer; font-weight:700; width:100%; margin-top:1rem; }
+    input { width:100%; padding:0.6rem; border-radius:6px; border:1px solid rgba(255,255,255,0.2); background:#090d16; color:#fff; margin-top:0.5rem; box-sizing:border-box; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>${payee}</h2>
+    <div style="font-size:2rem; font-weight:800; color:#38bdf8; margin:1rem 0;" id="displayAmount">₹${price}.00</div>
+    <p style="color:#94a3b8; font-size:0.85rem;">Pay securely using Cards, Netbanking, Wallets, or UPI via Razorpay.</p>
+    
+    <div style="margin:1rem 0; text-align:left;">
+      <label style="font-size:0.75rem; text-transform:uppercase; color:#94a3b8;">Have a coupon code?</label>
+      <div style="display:flex; gap:0.5rem; margin-top:0.25rem;">
+        <input type="text" id="vCode" placeholder="PROMO CODE" style="margin-top:0; text-transform:uppercase;" />
+        <button type="button" class="btn" style="width:auto; margin-top:0; padding:0.6rem 1rem; background:#3b82f6;" onclick="applyVoucher()">Apply</button>
+      </div>
+      <div id="vMsg" style="font-size:0.75rem; margin-top:0.3rem; display:none;"></div>
+    </div>
+
+    <button id="rzp-btn" class="btn" onclick="openRazorpay()">Pay with Razorpay 💳</button>
+  </div>
+
+  <script>
+    const letterRef = "${letterRef}";
+    const keyId = "${keyId}";
+    let currentAmount = ${price * 100};
+
+    function openRazorpay() {
+      const options = {
+        key: keyId,
+        amount: currentAmount,
+        currency: "INR",
+        name: "${payee}",
+        description: "Gift Unlock for " + letterRef,
+        handler: function (response) {
+          fetch('/api/payments/verify-utr', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ utr: response.razorpay_payment_id || 'RZP-' + Date.now(), letterRef })
+          }).then(() => {
+            alert('Payment Successful!');
+            window.location.href = '/en/letter/' + encodeURIComponent(letterRef) + '?payment=success';
+          });
+        },
+        theme: { color: "#ec4899" }
+      };
+      const rzp = new Razorpay(options);
+      rzp.open();
+    }
+
+    async function applyVoucher() {
+      const code = document.getElementById('vCode').value.trim();
+      const msg = document.getElementById('vMsg');
+      if (!code) return;
+      const res = await fetch('/api/voucher/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, letterRef })
+      });
+      const data = await res.json();
+      msg.style.display = 'block';
+      if (data.ok) {
+        msg.style.color = '#34d399';
+        msg.textContent = data.message;
+        document.getElementById('displayAmount').textContent = '₹' + data.finalPrice + '.00';
+        if (data.unlocked && data.redirectUrl) {
+          window.location.href = data.redirectUrl;
+        } else {
+          currentAmount = data.finalPrice * 100;
+        }
+      } else {
+        msg.style.color = '#f43f5e';
+        msg.textContent = data.error || 'Invalid code';
+      }
+    }
+  </script>
+</body>
+</html>`;
+
+  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+  res.end(html);
 }
 
 const drafts = {};
@@ -366,9 +766,229 @@ async function handleApiRequest(req, res, pathname) {
     return reply(res, { formatted: '₹' + PRICE_INR, priceAmount: PRICE_INR, currency: 'INR', symbol: '₹', free: false });
   }
 
-  // Coupons
-  if (pathname === '/api/coupons/validate') {
-    return reply(res, { ok: true, valid: true, discountPercent: 0, formattedDiscount: 'Standard UPI Discount' });
+  // --- Admin API Endpoints ---
+  if (pathname === '/api/admin/login') {
+    const password = (body.password || '').trim();
+    const hash = crypto.createHash('sha256').update(password).digest('hex');
+    const expectedHash = settings.adminPasswordHash || '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9';
+    if (hash === expectedHash) {
+      const token = crypto.randomBytes(32).toString('hex');
+      adminSessions.set(token, { createdAt: Date.now(), expiresAt: Date.now() + (24 * 3600 * 1000) });
+      res.setHeader('Set-Cookie', `luve_admin_token=${token}; HttpOnly; Path=/; Max-Age=86400; SameSite=Lax`);
+      return reply(res, { ok: true, token });
+    }
+    return reply(res, { ok: false, error: 'Incorrect supervisor password.' }, 401);
+  }
+
+  if (pathname === '/api/admin/auth-check') {
+    const auth = checkAdminAuth(req);
+    return reply(res, { ok: true, authenticated: auth });
+  }
+
+  if (pathname === '/api/admin/logout') {
+    const cookieHeader = req.headers.cookie || '';
+    const match = cookieHeader.match(/luve_admin_token=([^;]+)/);
+    if (match) adminSessions.delete(match[1]);
+    res.setHeader('Set-Cookie', `luve_admin_token=; HttpOnly; Path=/; Max-Age=0`);
+    return reply(res, { ok: true, loggedOut: true });
+  }
+
+  // Protected Admin Routes Guard
+  if (pathname.startsWith('/api/admin/')) {
+    if (!checkAdminAuth(req)) {
+      return reply(res, { ok: false, error: 'Unauthorized. Supervisor login required.' }, 401);
+    }
+
+    if (pathname === '/api/admin/settings') {
+      if (req.method === 'GET') {
+        const safe = { ...settings };
+        delete safe.adminPasswordHash;
+        return reply(res, { ok: true, settings: safe });
+      }
+      if (req.method === 'POST') {
+        if (body.activeGateway) settings.activeGateway = body.activeGateway;
+        if (body.defaultPrice !== undefined) settings.defaultPrice = Number(body.defaultPrice) || 99;
+        if (body.youpi) {
+          settings.youpi = { ...settings.youpi, ...body.youpi };
+        }
+        if (body.razorpay) {
+          settings.razorpay = { ...settings.razorpay, ...body.razorpay };
+        }
+        if (body.manualUpi) {
+          settings.manualUpi = { ...settings.manualUpi, ...body.manualUpi };
+        }
+        saveSettings();
+        syncGlobalVars();
+        const safe = { ...settings };
+        delete safe.adminPasswordHash;
+        return reply(res, { ok: true, settings: safe });
+      }
+    }
+
+    if (pathname === '/api/admin/change-password') {
+      const oldPw = (body.oldPassword || '').trim();
+      const newPw = (body.newPassword || '').trim();
+      const oldHash = crypto.createHash('sha256').update(oldPw).digest('hex');
+      const expectedHash = settings.adminPasswordHash || '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9';
+      if (oldHash !== expectedHash) {
+        return reply(res, { ok: false, error: 'Current password is incorrect.' }, 400);
+      }
+      if (newPw.length < 6) {
+        return reply(res, { ok: false, error: 'New password must be at least 6 characters.' }, 400);
+      }
+      settings.adminPasswordHash = crypto.createHash('sha256').update(newPw).digest('hex');
+      saveSettings();
+      return reply(res, { ok: true, message: 'Password updated successfully.' });
+    }
+
+    if (pathname === '/api/admin/vouchers') {
+      if (req.method === 'GET') {
+        return reply(res, { ok: true, vouchers });
+      }
+      if (req.method === 'POST') {
+        const code = (body.code || '').trim().toUpperCase();
+        if (!code || code.length < 3) {
+          return reply(res, { ok: false, error: 'Voucher code must be at least 3 characters.' }, 400);
+        }
+        vouchers[code] = {
+          code,
+          type: body.type || 'percent',
+          value: Number(body.value) || 0,
+          maxUses: Number(body.maxUses) || 50,
+          usedCount: 0,
+          active: true,
+          expiresAt: body.expiresAt || null,
+          note: body.note || '',
+          createdAt: new Date().toISOString()
+        };
+        saveVouchers();
+        return reply(res, { ok: true, voucher: vouchers[code] });
+      }
+    }
+
+    if (pathname.startsWith('/api/admin/vouchers/')) {
+      const rest = pathname.replace('/api/admin/vouchers/', '');
+      const parts = rest.split('/');
+      const code = decodeURIComponent(parts[0]).toUpperCase();
+
+      if (parts[1] === 'toggle' && req.method === 'POST') {
+        if (vouchers[code]) {
+          vouchers[code].active = !vouchers[code].active;
+          saveVouchers();
+          return reply(res, { ok: true, code, active: vouchers[code].active });
+        }
+        return reply(res, { ok: false, error: 'Voucher not found' }, 404);
+      }
+
+      if (req.method === 'DELETE') {
+        if (vouchers[code]) {
+          delete vouchers[code];
+          saveVouchers();
+          return reply(res, { ok: true, deleted: code });
+        }
+        return reply(res, { ok: false, error: 'Voucher not found' }, 404);
+      }
+    }
+
+    if (pathname === '/api/admin/letters') {
+      const list = Object.values(letters);
+      list.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+      return reply(res, { ok: true, letters: list });
+    }
+
+    if (pathname.startsWith('/api/admin/letters/')) {
+      const rest = pathname.replace('/api/admin/letters/', '');
+      const parts = rest.split('/');
+      const ref = decodeURIComponent(parts[0]);
+
+      if (parts[1] === 'toggle-paid' && req.method === 'POST') {
+        const target = letters[ref] || Object.values(letters).find(l => l.shareableLink === ref || l.id === ref);
+        if (target) {
+          target.paid = !target.paid;
+          target.isPaid = target.paid;
+          saveLetters();
+          return reply(res, { ok: true, paid: target.paid });
+        }
+        return reply(res, { ok: false, error: 'Letter not found' }, 404);
+      }
+
+      if (req.method === 'DELETE') {
+        let deleted = false;
+        if (letters[ref]) {
+          delete letters[ref];
+          deleted = true;
+        }
+        for (const k of Object.keys(letters)) {
+          if (letters[k].shareableLink === ref || letters[k].id === ref) {
+            delete letters[k];
+            deleted = true;
+          }
+        }
+        if (deleted) {
+          saveLetters();
+          return reply(res, { ok: true, deleted: ref });
+        }
+        return reply(res, { ok: false, error: 'Letter not found' }, 404);
+      }
+    }
+  }
+
+  // Public Voucher Application & Coupons
+  if (pathname === '/api/voucher/apply' || pathname === '/api/coupons/validate') {
+    const code = (body.code || body.couponCode || '').trim().toUpperCase();
+    const letterRef = body.letterRef || body.shareableLink || body.letterId || '';
+    if (!code) {
+      return reply(res, { ok: false, error: 'Please enter a voucher code.' }, 400);
+    }
+    const v = vouchers[code];
+    if (!v || !v.active) {
+      return reply(res, { ok: false, error: 'Invalid or inactive voucher code.' }, 400);
+    }
+    if (v.expiresAt && new Date(v.expiresAt).getTime() < Date.now()) {
+      return reply(res, { ok: false, error: 'This voucher has expired.' }, 400);
+    }
+    if (v.maxUses && v.usedCount >= v.maxUses) {
+      return reply(res, { ok: false, error: 'This voucher limit has been reached.' }, 400);
+    }
+
+    const basePrice = Number(settings.defaultPrice || PRICE_INR || 99);
+    let discount = 0;
+    if (v.type === 'percent' || v.type === 'free' || v.value >= 100) {
+      discount = Math.round((basePrice * (v.value || 100)) / 100);
+    } else if (v.type === 'flat') {
+      discount = Math.min(basePrice, Number(v.value || 0));
+    }
+    const finalPrice = Math.max(0, basePrice - discount);
+
+    if (finalPrice === 0) {
+      v.usedCount = (v.usedCount || 0) + 1;
+      saveVouchers();
+      if (letterRef) {
+        markLetterAsPaid(letterRef);
+      }
+      return reply(res, {
+        ok: true,
+        valid: true,
+        code: v.code,
+        discount,
+        basePrice,
+        finalPrice: 0,
+        unlocked: true,
+        message: '🎉 100% Free Pass Applied! Gift unlocked successfully.',
+        redirectUrl: `/en/letter/${encodeURIComponent(letterRef || 'birthday-gift')}?payment=success`
+      });
+    }
+
+    return reply(res, {
+      ok: true,
+      valid: true,
+      code: v.code,
+      discount,
+      basePrice,
+      finalPrice,
+      unlocked: false,
+      message: `🎟️ Voucher "${v.code}" applied: ₹${discount} discount (Pay only ₹${finalPrice})`
+    });
   }
 
   // Create Checkout Session with YouPI-PG
@@ -1320,7 +1940,17 @@ const primaryServer = http.createServer((req, res) => {
   const url = new URL(req.url, `http://localhost:${WEB_PORT}`);
   const pathname = url.pathname;
 
-  // Root Checkout / Pay redirects
+  // Supervisor & Admin Dashboard
+  if (pathname === '/admin' || pathname === '/admin/' || pathname === '/admin/index.html') {
+    const adminHtmlPath = path.join(__dirname, 'admin.html');
+    if (fs.existsSync(adminHtmlPath)) {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      fs.createReadStream(adminHtmlPath).pipe(res);
+      return;
+    }
+  }
+
+  // Root Checkout / Pay Dynamic Gateway Routing
   if (
     pathname === '/checkout' ||
     pathname === '/checkout/' ||
@@ -1334,17 +1964,36 @@ const primaryServer = http.createServer((req, res) => {
     const proto = req.headers['x-forwarded-proto'] || 'https';
     const host = req.headers.host || 'luve.duckdns.org';
     const hostUrl = `${proto}://${host}`;
-    getOrCreatePaymentSession('gift', hostUrl).then((sess) => {
+    const letterRef = url.searchParams.get('letter') || url.searchParams.get('id') || 'gift';
+    const activeGw = settings.activeGateway || 'youpi';
+
+    // 1. FREE MODE
+    if (activeGw === 'free') {
+      markLetterAsPaid(letterRef);
+      res.writeHead(302, { 'Location': `/en/letter/${encodeURIComponent(letterRef)}?payment=success` });
+      return res.end();
+    }
+
+    // 2. MANUAL UPI
+    if (activeGw === 'manual_upi') {
+      return serveManualUpiCheckout(req, res, letterRef, hostUrl);
+    }
+
+    // 3. RAZORPAY
+    if (activeGw === 'razorpay') {
+      return serveRazorpayCheckout(req, res, letterRef, hostUrl);
+    }
+
+    // 4. YOUPI-PG (Default)
+    getOrCreatePaymentSession(letterRef, hostUrl).then((sess) => {
       if (sess && sess.paymentId) {
         res.writeHead(302, { 'Location': `/checkout/${sess.paymentId}` });
         res.end();
       } else {
-        res.writeHead(302, { 'Location': '/en/create/birthday-party/' });
-        res.end();
+        return serveManualUpiCheckout(req, res, letterRef, hostUrl);
       }
     }).catch(() => {
-      res.writeHead(302, { 'Location': '/en/create/birthday-party/' });
-      res.end();
+      return serveManualUpiCheckout(req, res, letterRef, hostUrl);
     });
     return;
   }

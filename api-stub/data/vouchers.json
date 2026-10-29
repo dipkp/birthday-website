@@ -1,0 +1,24 @@
+{
+  "FREEGIFT": {
+    "code": "FREEGIFT",
+    "type": "percent",
+    "value": 100,
+    "maxUses": 100,
+    "usedCount": 0,
+    "active": true,
+    "expiresAt": "2027-12-31T23:59:59.000Z",
+    "createdAt": "2026-10-29T22:30:00.000Z",
+    "note": "100% Free VIP pass for testing & promotions"
+  },
+  "LUVE50": {
+    "code": "LUVE50",
+    "type": "flat",
+    "value": 50,
+    "maxUses": 50,
+    "usedCount": 0,
+    "active": true,
+    "expiresAt": "2027-12-31T23:59:59.000Z",
+    "createdAt": "2026-10-29T22:30:00.000Z",
+    "note": "Flat ₹50 discount (Pay only ₹49)"
+  }
+}

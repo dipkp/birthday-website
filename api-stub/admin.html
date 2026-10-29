@@ -1,0 +1,1361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Luve Gifts · Admin & Supervisor Hub</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #090d16;
+      --bg-card: rgba(18, 26, 43, 0.85);
+      --bg-card-hover: rgba(24, 35, 58, 0.95);
+      --border: rgba(255, 255, 255, 0.08);
+      --border-focus: #38bdf8;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --primary: #ec4899;
+      --primary-hover: #db2777;
+      --accent-cyan: #06b6d4;
+      --accent-emerald: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --font-display: 'Outfit', sans-serif;
+      --font-body: 'Plus Jakarta Sans', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+      --radius: 14px;
+      --radius-sm: 8px;
+      --shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(236, 72, 153, 0.12) 0px, transparent 50%),
+        radial-gradient(at 100% 0%, rgba(6, 182, 212, 0.12) 0px, transparent 50%),
+        radial-gradient(at 50% 100%, rgba(16, 185, 129, 0.08) 0px, transparent 50%);
+      background-attachment: fixed;
+      color: var(--text);
+      font-family: var(--font-body);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Top Navigation */
+    header {
+      background: rgba(11, 17, 30, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      padding: 0.75rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-family: var(--font-display);
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      text-decoration: none;
+      color: #fff;
+    }
+
+    .brand-badge {
+      background: linear-gradient(135deg, #ec4899, #8b5cf6);
+      color: white;
+      font-size: 0.7rem;
+      padding: 0.2rem 0.55rem;
+      border-radius: 9999px;
+      text-transform: uppercase;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 0.4rem;
+      background: rgba(255, 255, 255, 0.04);
+      padding: 0.3rem;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 0.5rem 1rem;
+      font-family: var(--font-body);
+      font-size: 0.85rem;
+      font-weight: 600;
+      border-radius: 7px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.2s ease;
+    }
+
+    .tab-btn:hover { color: #fff; background: rgba(255, 255, 255, 0.05); }
+    .tab-btn.active {
+      color: #fff;
+      background: linear-gradient(135deg, rgba(236, 72, 153, 0.25), rgba(139, 92, 246, 0.25));
+      border: 1px solid rgba(236, 72, 153, 0.4);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .active-gateway-badge {
+      font-size: 0.75rem;
+      font-family: var(--font-mono);
+      padding: 0.35rem 0.75rem;
+      border-radius: 9999px;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: #34d399;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .pulse-dot {
+      width: 7px;
+      height: 7px;
+      background: #34d399;
+      border-radius: 50%;
+      box-shadow: 0 0 8px #34d399;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    .btn {
+      padding: 0.5rem 1rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.85rem;
+      font-weight: 600;
+      font-family: var(--font-body);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      transition: all 0.2s ease;
+      border: none;
+      text-decoration: none;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #ec4899, #db2777);
+      color: #fff;
+      box-shadow: 0 4px 14px rgba(236, 72, 153, 0.3);
+    }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(236, 72, 153, 0.45); }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+
+    .btn-danger {
+      background: rgba(244, 63, 94, 0.15);
+      border: 1px solid rgba(244, 63, 94, 0.3);
+      color: #fda4af;
+    }
+    .btn-danger:hover { background: rgba(244, 63, 94, 0.3); color: #fff; }
+
+    .btn-sm { padding: 0.35rem 0.65rem; font-size: 0.75rem; border-radius: 6px; }
+
+    /* Layout Containers */
+    main {
+      flex: 1;
+      max-width: 1400px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; animation: fadeIn 0.25s ease; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Cards & Stats */
+    .grid-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 2rem;
+    }
+
+    .card {
+      background: var(--bg-card);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card-stat {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .stat-label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+    }
+
+    .stat-value {
+      font-size: 2.25rem;
+      font-weight: 800;
+      font-family: var(--font-display);
+      letter-spacing: -0.02em;
+      color: #fff;
+    }
+
+    .stat-sub {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+    }
+
+    /* Gateway Switcher Cards */
+    .gateway-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.25rem;
+      margin: 1.5rem 0;
+    }
+
+    .gw-card {
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      background: rgba(255, 255, 255, 0.02);
+      cursor: pointer;
+      transition: all 0.25s ease;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .gw-card:hover {
+      border-color: rgba(236, 72, 153, 0.4);
+      background: rgba(255, 255, 255, 0.04);
+      transform: translateY(-2px);
+    }
+
+    .gw-card.selected {
+      border-color: #ec4899;
+      background: linear-gradient(145deg, rgba(236, 72, 153, 0.1), rgba(139, 92, 246, 0.05));
+      box-shadow: 0 0 25px rgba(236, 72, 153, 0.2);
+    }
+
+    .gw-badge-active {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      background: #10b981;
+      color: #fff;
+      font-size: 0.65rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      padding: 0.2rem 0.5rem;
+      border-radius: 9999px;
+      display: none;
+    }
+
+    .gw-card.selected .gw-badge-active { display: block; }
+
+    .gw-icon {
+      font-size: 2rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .gw-title {
+      font-family: var(--font-display);
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .gw-desc {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+      flex: 1;
+    }
+
+    /* Forms */
+    .form-group {
+      margin-bottom: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    input[type="text"], input[type="password"], input[type="number"], select, textarea {
+      width: 100%;
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 0.65rem 0.85rem;
+      color: #fff;
+      font-family: var(--font-body);
+      font-size: 0.9rem;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      border-color: #ec4899;
+      box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.2);
+    }
+
+    /* Tables */
+    .table-container {
+      overflow-x: auto;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      margin-top: 1rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.85rem;
+    }
+
+    th {
+      background: rgba(255, 255, 255, 0.03);
+      padding: 0.75rem 1rem;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+    }
+
+    td {
+      padding: 0.85rem 1rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      color: var(--text);
+    }
+
+    tr:hover td { background: rgba(255, 255, 255, 0.02); }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.25rem 0.6rem;
+      border-radius: 9999px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .badge-paid { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .badge-unpaid { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+    .badge-active { background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); }
+    .badge-inactive { background: rgba(148, 163, 184, 0.15); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.3); }
+
+    /* Modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(8px);
+      z-index: 100;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+
+    .modal-backdrop.open { display: flex; animation: fadeIn 0.2s ease; }
+
+    .modal {
+      background: #111827;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      width: 100%;
+      max-width: 500px;
+      padding: 1.75rem;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.25rem;
+    }
+
+    .modal-title { font-family: var(--font-display); font-size: 1.25rem; font-weight: 700; color: #fff; }
+    .modal-close { background: none; border: none; color: var(--text-muted); font-size: 1.25rem; cursor: pointer; }
+
+    /* Login Screen */
+    #loginScreen {
+      position: fixed;
+      inset: 0;
+      background: #090d16;
+      background-image: radial-gradient(at 50% 50%, rgba(236, 72, 153, 0.15) 0px, transparent 60%);
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+
+    .login-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 2.5rem;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+      text-align: center;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      background: #1e293b;
+      border: 1px solid var(--border);
+      color: #fff;
+      padding: 0.75rem 1.25rem;
+      border-radius: 10px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      z-index: 300;
+      transform: translateY(100px);
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .toast.show { transform: translateY(0); opacity: 1; }
+    .toast.success { border-color: rgba(16, 185, 129, 0.5); }
+    .toast.error { border-color: rgba(244, 63, 94, 0.5); }
+  </style>
+</head>
+<body>
+
+  <!-- LOGIN SCREEN (Shown if unauthenticated) -->
+  <div id="loginScreen">
+    <div class="login-box">
+      <div style="font-size:2.5rem; margin-bottom: 0.5rem;">💌</div>
+      <h2 style="font-family: var(--font-display); font-size: 1.6rem; margin-bottom: 0.5rem;">Luve Gifts Admin</h2>
+      <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.75rem;">Enter supervisor password to manage vouchers, gateways & gifts</p>
+      
+      <form id="loginForm" onsubmit="handleLogin(event)">
+        <div class="form-group" style="text-align:left;">
+          <label for="adminPassword">Password</label>
+          <input type="password" id="adminPassword" placeholder="Enter password (default: admin123)" required autofocus />
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center; padding:0.75rem; margin-top:0.5rem;">
+          Unlock Dashboard ⚡
+        </button>
+      </form>
+      <div id="loginError" style="color: var(--accent-rose); font-size: 0.8rem; margin-top: 1rem; display:none;"></div>
+    </div>
+  </div>
+
+  <!-- MAIN DASHBOARD -->
+  <header>
+    <div style="display:flex; align-items:center; gap: 1.25rem;">
+      <a href="/admin" class="brand">
+        <span>Luve Gifts</span>
+        <span class="brand-badge">Admin</span>
+      </a>
+      <div class="active-gateway-badge" id="topActiveGatewayBadge">
+        <span class="pulse-dot"></span>
+        <span id="topGatewayName">Gateway: YouPI-PG</span>
+      </div>
+    </div>
+
+    <nav class="nav-tabs">
+      <button class="tab-btn active" onclick="switchTab('overview')">📊 Overview</button>
+      <button class="tab-btn" onclick="switchTab('gateways')">🔀 Gateway Switcher</button>
+      <button class="tab-btn" onclick="switchTab('vouchers')">🎟️ Vouchers</button>
+      <button class="tab-btn" onclick="switchTab('gifts')">💌 Gifts & Letters</button>
+      <button class="tab-btn" onclick="switchTab('settings')">⚙️ Security</button>
+    </nav>
+
+    <div class="header-actions">
+      <a href="/" target="_blank" class="btn btn-secondary btn-sm" title="View live birthday website">🌐 Live Site</a>
+      <a href="/pay" target="_blank" class="btn btn-secondary btn-sm" title="Test active payment gateway">💳 Test Checkout</a>
+      <button onclick="handleLogout()" class="btn btn-danger btn-sm">Logout</button>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- TAB 1: OVERVIEW -->
+    <div id="tab-overview" class="tab-content active">
+      <div class="grid-stats">
+        <div class="card card-stat">
+          <div class="stat-label">Total Gifts Created</div>
+          <div class="stat-value" id="statTotalGifts">0</div>
+          <div class="stat-sub">Lifetime letters generated</div>
+        </div>
+        <div class="card card-stat">
+          <div class="stat-label">Paid & Unlocked</div>
+          <div class="stat-value" style="color: #34d399;" id="statPaidGifts">0</div>
+          <div class="stat-sub" id="statConversion">0% Conversion rate</div>
+        </div>
+        <div class="card card-stat">
+          <div class="stat-label">Total Revenue</div>
+          <div class="stat-value" style="color: #f472b6;" id="statTotalRevenue">₹0</div>
+          <div class="stat-sub" id="statPricePerLetter">Price: ₹99 per letter</div>
+        </div>
+        <div class="card card-stat">
+          <div class="stat-label">Active Vouchers</div>
+          <div class="stat-value" style="color: #60a5fa;" id="statActiveVouchers">0</div>
+          <div class="stat-sub">Discount codes in circulation</div>
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns: 2fr 1fr; gap:1.5rem;">
+        <div class="card">
+          <h3 style="font-family:var(--font-display); font-size:1.15rem; margin-bottom:1rem; display:flex; justify-content:space-between; align-items:center;">
+            <span>Recent Birthday Gifts</span>
+            <button class="btn btn-secondary btn-sm" onclick="fetchLetters()">Refresh</button>
+          </h3>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Recipient</th>
+                  <th>Sender</th>
+                  <th>Theme</th>
+                  <th>Status</th>
+                  <th>Link</th>
+                </tr>
+              </thead>
+              <tbody id="overviewRecentGiftsTable">
+                <tr><td colspan="5" style="text-align:center; color:var(--text-dim);">Loading letters...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 style="font-family:var(--font-display); font-size:1.15rem; margin-bottom:1rem;">Active Payment Status</h3>
+          <div style="background:rgba(255,255,255,0.02); border:1px solid var(--border); border-radius:10px; padding:1.25rem; display:flex; flex-direction:column; gap:0.75rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="color:var(--text-muted); font-size:0.85rem;">Active Engine:</span>
+              <span class="badge badge-paid" id="overviewActiveGateway">YouPI-PG</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="color:var(--text-muted); font-size:0.85rem;">Standard Fee:</span>
+              <strong style="color:#fff;" id="overviewPriceTag">₹99.00</strong>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="color:var(--text-muted); font-size:0.85rem;">Payee UPI ID:</span>
+              <span style="font-family:var(--font-mono); font-size:0.8rem; color:#38bdf8;" id="overviewUpiId">dipraksh@pingpay</span>
+            </div>
+            <hr style="border:none; border-top:1px solid var(--border); margin:0.25rem 0;" />
+            <button class="btn btn-primary" onclick="switchTab('gateways')" style="justify-content:center;">
+              Change Active Gateway 🔀
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: GATEWAY SWITCHER -->
+    <div id="tab-gateways" class="tab-content">
+      <div style="margin-bottom: 1.5rem;">
+        <h2 style="font-family:var(--font-display); font-size:1.5rem;">Payment Gateway Switcher</h2>
+        <p style="color:var(--text-muted); font-size:0.85rem;">Select which payment engine handles checkout for all incoming birthday gift buyers.</p>
+      </div>
+
+      <div class="gateway-cards">
+        <!-- 1. YouPI-PG -->
+        <div class="gw-card" id="gwCard-youpi" onclick="selectGateway('youpi')">
+          <span class="gw-badge-active">ACTIVE</span>
+          <div class="gw-icon">⚡</div>
+          <div class="gw-title">YouPI-PG (Direct UPI)</div>
+          <div class="gw-desc">Instant 0% transaction fee payments straight to your personal UPI ID. Supports dynamic QR codes and instant deep-linking into GPay, PhonePe, Paytm, and BHIM.</div>
+          <div style="font-family:var(--font-mono); font-size:0.75rem; color:#34d399;">Payee: dipraksh@pingpay</div>
+        </div>
+
+        <!-- 2. Razorpay -->
+        <div class="gw-card" id="gwCard-razorpay" onclick="selectGateway('razorpay')">
+          <span class="gw-badge-active">ACTIVE</span>
+          <div class="gw-icon">💳</div>
+          <div class="gw-title">Razorpay Standard</div>
+          <div class="gw-desc">Full-featured payment gateway supporting Indian & International Credit/Debit Cards, Netbanking (50+ banks), UPI, and Wallets. Requires Razorpay Key ID.</div>
+          <div style="font-family:var(--font-mono); font-size:0.75rem; color:#60a5fa;">Cards, Netbanking & UPI</div>
+        </div>
+
+        <!-- 3. Manual UPI QR -->
+        <div class="gw-card" id="gwCard-manual_upi" onclick="selectGateway('manual_upi')">
+          <span class="gw-badge-active">ACTIVE</span>
+          <div class="gw-icon">📲</div>
+          <div class="gw-title">Manual UPI & UTR Entry</div>
+          <div class="gw-desc">Direct static UPI QR code displayed on screen. Customer scans and enters their 12-digit bank reference (UTR) number to verify. 100% independent.</div>
+          <div style="font-family:var(--font-mono); font-size:0.75rem; color:#fbbf24;">Zero Gateway Dependency</div>
+        </div>
+
+        <!-- 4. Free Mode -->
+        <div class="gw-card" id="gwCard-free" onclick="selectGateway('free')">
+          <span class="gw-badge-active">ACTIVE</span>
+          <div class="gw-icon">🎁</div>
+          <div class="gw-title">100% Free Pass Mode</div>
+          <div class="gw-desc">Bypasses all payments entirely! Every gift created is automatically unlocked instantly for free. Ideal for testing, promotional campaigns, or festivals.</div>
+          <div style="font-family:var(--font-mono); font-size:0.75rem; color:#f472b6;">₹0 / Free Instant Unlock</div>
+        </div>
+      </div>
+
+      <!-- Gateway Settings Form -->
+      <div class="card" style="margin-top:2rem;">
+        <h3 style="font-family:var(--font-display); font-size:1.15rem; margin-bottom:1.25rem;">Payment Gateway Configuration & Credentials</h3>
+        
+        <form id="gatewaySettingsForm" onsubmit="saveGatewaySettings(event)">
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:1.25rem;">
+            
+            <div class="form-group">
+              <label for="settingPrice">Default Letter Price (₹ INR)</label>
+              <input type="number" id="settingPrice" min="0" required />
+            </div>
+
+            <div class="form-group">
+              <label for="settingYoupiUpi">YouPI Primary UPI ID</label>
+              <input type="text" id="settingYoupiUpi" placeholder="dipraksh@pingpay" />
+            </div>
+
+            <div class="form-group">
+              <label for="settingYoupiAltUpi">YouPI Secondary UPI ID</label>
+              <input type="text" id="settingYoupiAltUpi" placeholder="9327792155@upi" />
+            </div>
+
+            <div class="form-group">
+              <label for="settingPayeeName">Merchant / Payee Name</label>
+              <input type="text" id="settingPayeeName" placeholder="Luve gifts" />
+            </div>
+
+            <div class="form-group">
+              <label for="settingRazorpayKeyId">Razorpay Key ID (rzp_live_... / rzp_test_...)</label>
+              <input type="text" id="settingRazorpayKeyId" placeholder="rzp_live_xxxxxxxxxxxxxx" />
+            </div>
+
+            <div class="form-group">
+              <label for="settingRazorpayKeySecret">Razorpay Key Secret</label>
+              <input type="password" id="settingRazorpayKeySecret" placeholder="••••••••••••••••••••••••" />
+            </div>
+
+          </div>
+
+          <div style="margin-top:1.5rem; display:flex; justify-content:flex-end; gap:1rem;">
+            <button type="submit" class="btn btn-primary" style="padding:0.65rem 1.75rem;">
+              💾 Save & Activate Configuration
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- TAB 3: VOUCHERS -->
+    <div id="tab-vouchers" class="tab-content">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
+        <div>
+          <h2 style="font-family:var(--font-display); font-size:1.5rem;">Vouchers & Discount Promo Codes</h2>
+          <p style="color:var(--text-muted); font-size:0.85rem;">Create coupons, 100% free passes, or flat discounts for customers.</p>
+        </div>
+        <button class="btn btn-primary" onclick="openNewVoucherModal()">+ Create New Voucher</button>
+      </div>
+
+      <div class="card">
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Voucher Code</th>
+                <th>Discount Type & Value</th>
+                <th>Redemptions</th>
+                <th>Status</th>
+                <th>Expiry Date</th>
+                <th>Notes</th>
+                <th style="text-align:right;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="vouchersTableBody">
+              <tr><td colspan="7" style="text-align:center; color:var(--text-dim);">Loading vouchers...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 4: GIFTS & LETTERS -->
+    <div id="tab-gifts" class="tab-content">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem;">
+        <div>
+          <h2 style="font-family:var(--font-display); font-size:1.5rem;">Birthday Gifts & Letters Monitor</h2>
+          <p style="color:var(--text-muted); font-size:0.85rem;">Browse, inspect, manually unlock, or manage all generated gifts in real-time.</p>
+        </div>
+        <div style="display:flex; gap:0.5rem; align-items:center;">
+          <input type="text" id="giftSearchInput" placeholder="Search by recipient or sender..." oninput="filterGifts()" style="width:260px;" />
+          <button class="btn btn-secondary" onclick="fetchLetters()">Refresh</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Recipient</th>
+                <th>Author</th>
+                <th>Theme</th>
+                <th>Created Date</th>
+                <th>Status</th>
+                <th>Link ID</th>
+                <th style="text-align:right;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="giftsTableBody">
+              <tr><td colspan="7" style="text-align:center; color:var(--text-dim);">Loading letters...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 5: SECURITY -->
+    <div id="tab-settings" class="tab-content">
+      <div style="margin-bottom: 1.5rem;">
+        <h2 style="font-family:var(--font-display); font-size:1.5rem;">Security & Admin Password</h2>
+        <p style="color:var(--text-muted); font-size:0.85rem;">Manage supervisor credentials and backup configuration.</p>
+      </div>
+
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:1.5rem;">
+        <div class="card">
+          <h3 style="font-family:var(--font-display); font-size:1.15rem; margin-bottom:1rem;">Change Admin Password</h3>
+          <form onsubmit="handleChangePassword(event)">
+            <div class="form-group">
+              <label for="oldPassword">Current Password</label>
+              <input type="password" id="oldPassword" required />
+            </div>
+            <div class="form-group">
+              <label for="newPassword">New Password</label>
+              <input type="password" id="newPassword" required minlength="6" />
+            </div>
+            <div class="form-group">
+              <label for="confirmNewPassword">Confirm New Password</label>
+              <input type="password" id="confirmNewPassword" required minlength="6" />
+            </div>
+            <button type="submit" class="btn btn-primary" style="margin-top:0.5rem;">Update Password</button>
+          </form>
+        </div>
+
+        <div class="card">
+          <h3 style="font-family:var(--font-display); font-size:1.15rem; margin-bottom:1rem;">Data Backup & Export</h3>
+          <p style="color:var(--text-muted); font-size:0.85rem; line-height:1.5; margin-bottom:1.5rem;">
+            Download a snapshot of all saved letters, customer messages, vouchers, and settings as JSON files.
+          </p>
+          <div style="display:flex; flex-direction:column; gap:0.75rem;">
+            <button class="btn btn-secondary" onclick="exportData('letters')">📥 Export Letters (JSON)</button>
+            <button class="btn btn-secondary" onclick="exportData('vouchers')">📥 Export Vouchers (JSON)</button>
+            <button class="btn btn-secondary" onclick="exportData('settings')">📥 Export Settings (JSON)</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- CREATE VOUCHER MODAL -->
+  <div class="modal-backdrop" id="newVoucherModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title">Create New Voucher</h3>
+        <button class="modal-close" onclick="closeNewVoucherModal()">&times;</button>
+      </div>
+      <form onsubmit="handleCreateVoucher(event)">
+        <div class="form-group">
+          <label for="vCode">Voucher Code</label>
+          <input type="text" id="vCode" placeholder="e.g. DIWALI50 or FREEPASS" required style="text-transform:uppercase;" />
+        </div>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.75rem;">
+          <div class="form-group">
+            <label for="vType">Discount Type</label>
+            <select id="vType" onchange="adjustVoucherInputs()">
+              <option value="percent">Percentage (% Off)</option>
+              <option value="flat">Flat Amount (₹ Off)</option>
+              <option value="free">100% Free Pass (₹0)</option>
+            </select>
+          </div>
+          <div class="form-group" id="vValGroup">
+            <label for="vValue">Discount Value</label>
+            <input type="number" id="vValue" value="50" min="1" max="100" required />
+          </div>
+        </div>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.75rem;">
+          <div class="form-group">
+            <label for="vMaxUses">Usage Quota (Max Uses)</label>
+            <input type="number" id="vMaxUses" value="50" min="1" required />
+          </div>
+          <div class="form-group">
+            <label for="vExpiry">Expiry Date</label>
+            <input type="date" id="vExpiry" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="vNote">Description / Note</label>
+          <input type="text" id="vNote" placeholder="e.g. Festive discount code for Instagram promo" />
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:0.75rem; margin-top:1.5rem;">
+          <button type="button" class="btn btn-secondary" onclick="closeNewVoucherModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create Voucher</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toast" class="toast">
+    <span id="toastIcon">✓</span>
+    <span id="toastMsg">Action completed successfully</span>
+  </div>
+
+  <script>
+    let globalSettings = {};
+    let globalVouchers = {};
+    let globalLetters = [];
+    let activeSelectedGateway = 'youpi';
+
+    // Toast helper
+    function showToast(msg, type = 'success') {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toastMsg');
+      const toastIcon = document.getElementById('toastIcon');
+      toast.className = 'toast ' + type + ' show';
+      toastMsg.textContent = msg;
+      toastIcon.textContent = type === 'success' ? '✓' : '⚠️';
+      setTimeout(() => { toast.classList.remove('show'); }, 3000);
+    }
+
+    // Switch Tabs
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      const activeBtn = Array.from(document.querySelectorAll('.tab-btn')).find(b => b.getAttribute('onclick').includes(tabId));
+      if (activeBtn) activeBtn.classList.add('active');
+      const target = document.getElementById('tab-' + tabId);
+      if (target) target.classList.add('active');
+
+      if (tabId === 'vouchers') fetchVouchers();
+      if (tabId === 'gifts') fetchLetters();
+      if (tabId === 'overview') refreshDashboard();
+    }
+
+    // Authentication
+    async function checkAuth() {
+      try {
+        const res = await fetch('/api/admin/auth-check');
+        const data = await res.json();
+        if (data.ok && data.authenticated) {
+          document.getElementById('loginScreen').style.display = 'none';
+          refreshDashboard();
+        } else {
+          document.getElementById('loginScreen').style.display = 'flex';
+        }
+      } catch (e) {
+        document.getElementById('loginScreen').style.display = 'flex';
+      }
+    }
+
+    async function handleLogin(e) {
+      e.preventDefault();
+      const password = document.getElementById('adminPassword').value;
+      const errEl = document.getElementById('loginError');
+      errEl.style.display = 'none';
+
+      try {
+        const res = await fetch('/api/admin/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          document.getElementById('loginScreen').style.display = 'none';
+          showToast('Welcome to Luve Admin Dashboard');
+          refreshDashboard();
+        } else {
+          errEl.textContent = data.error || 'Invalid supervisor password.';
+          errEl.style.display = 'block';
+        }
+      } catch (err) {
+        errEl.textContent = 'Server connection error. Please retry.';
+        errEl.style.display = 'block';
+      }
+    }
+
+    async function handleLogout() {
+      await fetch('/api/admin/logout', { method: 'POST' });
+      document.getElementById('loginScreen').style.display = 'flex';
+      document.getElementById('adminPassword').value = '';
+    }
+
+    // Refresh Dashboard Data
+    async function refreshDashboard() {
+      await fetchSettings();
+      await fetchLetters();
+      await fetchVouchers();
+      updateStats();
+    }
+
+    // Settings & Gateway Switch
+    async function fetchSettings() {
+      try {
+        const res = await fetch('/api/admin/settings');
+        const data = await res.json();
+        if (data.ok && data.settings) {
+          globalSettings = data.settings;
+          activeSelectedGateway = globalSettings.activeGateway || 'youpi';
+          renderGatewaySelection(activeSelectedGateway);
+          populateSettingsForm(globalSettings);
+          updateTopBadge(activeSelectedGateway);
+        }
+      } catch (e) {
+        console.error('Failed to fetch settings', e);
+      }
+    }
+
+    function selectGateway(gw) {
+      activeSelectedGateway = gw;
+      renderGatewaySelection(gw);
+    }
+
+    function renderGatewaySelection(activeGw) {
+      document.querySelectorAll('.gw-card').forEach(c => c.classList.remove('selected'));
+      const activeCard = document.getElementById('gwCard-' + activeGw);
+      if (activeCard) activeCard.classList.add('selected');
+    }
+
+    function updateTopBadge(gw) {
+      const topBadge = document.getElementById('topGatewayName');
+      const overviewBadge = document.getElementById('overviewActiveGateway');
+      const names = {
+        youpi: 'YouPI-PG (UPI 0%)',
+        razorpay: 'Razorpay Cards/UPI',
+        manual_upi: 'Manual UPI QR',
+        free: '100% Free Mode'
+      };
+      const text = names[gw] || gw.toUpperCase();
+      topBadge.textContent = 'Gateway: ' + text;
+      overviewBadge.textContent = text;
+    }
+
+    function populateSettingsForm(s) {
+      document.getElementById('settingPrice').value = s.defaultPrice || 99;
+      document.getElementById('statPricePerLetter').textContent = `Price: ₹${s.defaultPrice || 99} per letter`;
+      document.getElementById('overviewPriceTag').textContent = `₹${s.defaultPrice || 99}.00`;
+
+      if (s.youpi) {
+        document.getElementById('settingYoupiUpi').value = s.youpi.upiId || 'dipraksh@pingpay';
+        document.getElementById('settingYoupiAltUpi').value = s.youpi.altUpiId || '9327792155@upi';
+        document.getElementById('settingPayeeName').value = s.youpi.payeeName || 'Luve gifts';
+        document.getElementById('overviewUpiId').textContent = s.youpi.upiId || 'dipraksh@pingpay';
+      }
+      if (s.razorpay) {
+        document.getElementById('settingRazorpayKeyId').value = s.razorpay.keyId || '';
+        document.getElementById('settingRazorpayKeySecret').value = s.razorpay.keySecret || '';
+      }
+    }
+
+    async function saveGatewaySettings(e) {
+      e.preventDefault();
+      const payload = {
+        activeGateway: activeSelectedGateway,
+        defaultPrice: Number(document.getElementById('settingPrice').value) || 99,
+        youpi: {
+          upiId: document.getElementById('settingYoupiUpi').value.trim(),
+          altUpiId: document.getElementById('settingYoupiAltUpi').value.trim(),
+          payeeName: document.getElementById('settingPayeeName').value.trim()
+        },
+        razorpay: {
+          keyId: document.getElementById('settingRazorpayKeyId').value.trim(),
+          keySecret: document.getElementById('settingRazorpayKeySecret').value.trim()
+        }
+      };
+
+      try {
+        const res = await fetch('/api/admin/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.ok) {
+          showToast(`Active Gateway switched to: ${activeSelectedGateway.toUpperCase()}`);
+          await fetchSettings();
+        } else {
+          showToast(data.error || 'Failed to update settings', 'error');
+        }
+      } catch (err) {
+        showToast('Error saving settings', 'error');
+      }
+    }
+
+    // Vouchers CRUD
+    async function fetchVouchers() {
+      try {
+        const res = await fetch('/api/admin/vouchers');
+        const data = await res.json();
+        if (data.ok) {
+          globalVouchers = data.vouchers || {};
+          renderVouchersTable(globalVouchers);
+          updateStats();
+        }
+      } catch (e) {
+        console.error('Failed to fetch vouchers', e);
+      }
+    }
+
+    function renderVouchersTable(vouchers) {
+      const tbody = document.getElementById('vouchersTableBody');
+      const keys = Object.keys(vouchers);
+      if (keys.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--text-dim);">No active vouchers created yet. Click "+ Create New Voucher" above.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = keys.map(code => {
+        const v = vouchers[code];
+        const typeBadge = v.type === 'percent' 
+          ? `<span class="badge badge-active">${v.value}% OFF</span>`
+          : v.type === 'free' || v.value === 100 
+            ? `<span class="badge badge-paid">100% FREE PASS</span>` 
+            : `<span class="badge badge-active">₹${v.value} OFF</span>`;
+        const statusBadge = v.active 
+          ? `<span class="badge badge-paid">Active</span>`
+          : `<span class="badge badge-inactive">Paused</span>`;
+
+        return `
+          <tr>
+            <td><strong style="font-family:var(--font-mono); color:#fff; font-size:1rem;">${v.code}</strong></td>
+            <td>${typeBadge}</td>
+            <td><strong>${v.usedCount || 0}</strong> / ${v.maxUses || '∞'} uses</td>
+            <td>${statusBadge}</td>
+            <td style="color:var(--text-muted); font-size:0.8rem;">${v.expiresAt ? v.expiresAt.split('T')[0] : 'Never'}</td>
+            <td style="color:var(--text-dim); font-size:0.8rem;">${v.note || '-'}</td>
+            <td style="text-align:right;">
+              <button class="btn btn-secondary btn-sm" onclick="toggleVoucher('${v.code}')" title="Pause or Resume">
+                ${v.active ? '⏸️ Pause' : '▶️ Activate'}
+              </button>
+              <button class="btn btn-danger btn-sm" onclick="deleteVoucher('${v.code}')" title="Delete Voucher">
+                🗑️ Delete
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function openNewVoucherModal() {
+      document.getElementById('newVoucherModal').classList.add('open');
+      const tomorrow = new Date();
+      tomorrow.setFullYear(tomorrow.getFullYear() + 1);
+      document.getElementById('vExpiry').value = tomorrow.toISOString().split('T')[0];
+    }
+
+    function closeNewVoucherModal() {
+      document.getElementById('newVoucherModal').classList.remove('open');
+    }
+
+    function adjustVoucherInputs() {
+      const type = document.getElementById('vType').value;
+      const group = document.getElementById('vValGroup');
+      const valInput = document.getElementById('vValue');
+      if (type === 'free') {
+        group.style.display = 'none';
+        valInput.value = 100;
+      } else {
+        group.style.display = 'block';
+        valInput.max = type === 'percent' ? 100 : 999;
+      }
+    }
+
+    async function handleCreateVoucher(e) {
+      e.preventDefault();
+      const code = document.getElementById('vCode').value.trim().toUpperCase();
+      const type = document.getElementById('vType').value;
+      const value = type === 'free' ? 100 : Number(document.getElementById('vValue').value);
+      const maxUses = Number(document.getElementById('vMaxUses').value) || 50;
+      const expiresAt = document.getElementById('vExpiry').value ? new Date(document.getElementById('vExpiry').value).toISOString() : null;
+      const note = document.getElementById('vNote').value.trim();
+
+      try {
+        const res = await fetch('/api/admin/vouchers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code, type: type === 'free' ? 'percent' : type, value, maxUses, expiresAt, note })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          showToast(`Voucher ${code} created successfully!`);
+          closeNewVoucherModal();
+          fetchVouchers();
+        } else {
+          showToast(data.error || 'Failed to create voucher', 'error');
+        }
+      } catch (err) {
+        showToast('Error creating voucher', 'error');
+      }
+    }
+
+    async function toggleVoucher(code) {
+      try {
+        const res = await fetch(`/api/admin/vouchers/${encodeURIComponent(code)}/toggle`, { method: 'POST' });
+        const data = await res.json();
+        if (data.ok) {
+          showToast(`Voucher ${code} status updated`);
+          fetchVouchers();
+        }
+      } catch (e) {
+        showToast('Failed to toggle voucher', 'error');
+      }
+    }
+
+    async function deleteVoucher(code) {
+      if (!confirm(`Are you sure you want to permanently delete voucher "${code}"?`)) return;
+      try {
+        const res = await fetch(`/api/admin/vouchers/${encodeURIComponent(code)}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.ok) {
+          showToast(`Voucher ${code} deleted`);
+          fetchVouchers();
+        }
+      } catch (e) {
+        showToast('Failed to delete voucher', 'error');
+      }
+    }
+
+    // Letters & Gifts Monitor
+    async function fetchLetters() {
+      try {
+        const res = await fetch('/api/admin/letters');
+        const data = await res.json();
+        if (data.ok) {
+          globalLetters = data.letters || [];
+          renderLettersTable(globalLetters);
+          renderOverviewTable(globalLetters);
+          updateStats();
+        }
+      } catch (e) {
+        console.error('Failed to fetch letters', e);
+      }
+    }
+
+    function renderLettersTable(letters) {
+      const tbody = document.getElementById('giftsTableBody');
+      if (letters.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--text-dim);">No gifts found.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = letters.map(l => {
+        const isPaid = l.paid || l.isPaid;
+        const statusBadge = isPaid
+          ? `<span class="badge badge-paid">✓ Paid & Live</span>`
+          : `<span class="badge badge-unpaid">⏳ Unpaid</span>`;
+
+        const link = `/en/letter/${encodeURIComponent(l.shareableLink || l.id)}`;
+        const dateStr = l.createdAt ? new Date(l.createdAt).toLocaleDateString() : 'Recent';
+
+        return `
+          <tr>
+            <td><strong style="color:#fff;">${escapeHtml(l.recipientName || 'Friend')}</strong></td>
+            <td>${escapeHtml(l.authorName || 'Guest')}</td>
+            <td><span class="badge badge-active">${escapeHtml(l.theme || 'party')}</span></td>
+            <td style="color:var(--text-muted); font-size:0.8rem;">${dateStr}</td>
+            <td>${statusBadge}</td>
+            <td style="font-family:var(--font-mono); font-size:0.75rem; color:var(--accent-cyan);">${l.shareableLink || l.id}</td>
+            <td style="text-align:right;">
+              <a href="${link}" target="_blank" class="btn btn-secondary btn-sm" title="Preview gift letter">👁️ View</a>
+              <button class="btn btn-secondary btn-sm" onclick="toggleLetterPaid('${l.shareableLink || l.id}')" title="Manually unlock or lock">
+                ${isPaid ? '🔒 Lock' : '🔓 Unlock'}
+              </button>
+              <button class="btn btn-danger btn-sm" onclick="deleteLetter('${l.shareableLink || l.id}')" title="Delete gift letter">🗑️</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function renderOverviewTable(letters) {
+      const tbody = document.getElementById('overviewRecentGiftsTable');
+      const recent = letters.slice(0, 5);
+      if (recent.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--text-dim);">No letters created yet.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = recent.map(l => `
+        <tr>
+          <td><strong style="color:#fff;">${escapeHtml(l.recipientName || 'Gift')}</strong></td>
+          <td>${escapeHtml(l.authorName || 'Guest')}</td>
+          <td><span class="badge badge-active">${escapeHtml(l.theme || 'party')}</span></td>
+          <td>${(l.paid || l.isPaid) ? '<span class="badge badge-paid">Paid</span>' : '<span class="badge badge-unpaid">Unpaid</span>'}</td>
+          <td><a href="/en/letter/${encodeURIComponent(l.shareableLink || l.id)}" target="_blank" style="color:#38bdf8; text-decoration:none;">View →</a></td>
+        </tr>
+      `).join('');
+    }
+
+    function filterGifts() {
+      const q = document.getElementById('giftSearchInput').value.toLowerCase().trim();
+      const filtered = globalLetters.filter(l => 
+        (l.recipientName || '').toLowerCase().includes(q) ||
+        (l.authorName || '').toLowerCase().includes(q) ||
+        (l.shareableLink || '').toLowerCase().includes(q)
+      );
+      renderLettersTable(filtered);
+    }
+
+    async function toggleLetterPaid(ref) {
+      try {
+        const res = await fetch(`/api/admin/letters/${encodeURIComponent(ref)}/toggle-paid`, { method: 'POST' });
+        const data = await res.json();
+        if (data.ok) {
+          showToast(`Letter status changed to ${data.paid ? 'PAID' : 'UNPAID'}`);
+          fetchLetters();
+        }
+      } catch (e) {
+        showToast('Failed to toggle status', 'error');
+      }
+    }
+
+    async function deleteLetter(ref) {
+      if (!confirm(`Permanently delete gift "${ref}"? This cannot be undone.`)) return;
+      try {
+        const res = await fetch(`/api/admin/letters/${encodeURIComponent(ref)}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.ok) {
+          showToast('Gift deleted');
+          fetchLetters();
+        }
+      } catch (e) {
+        showToast('Failed to delete gift', 'error');
+      }
+    }
+
+    // Stats calculations
+    function updateStats() {
+      const total = globalLetters.length;
+      const paid = globalLetters.filter(l => l.paid || l.isPaid).length;
+      const price = globalSettings.defaultPrice || 99;
+      const revenue = paid * price;
+      const activeVouchers = Object.values(globalVouchers).filter(v => v.active).length;
+
+      document.getElementById('statTotalGifts').textContent = total;
+      document.getElementById('statPaidGifts').textContent = paid;
+      document.getElementById('statConversion').textContent = total > 0 ? Math.round((paid / total) * 100) + '% Conversion rate' : '0% Conversion rate';
+      document.getElementById('statTotalRevenue').textContent = '₹' + revenue.toLocaleString();
+      document.getElementById('statActiveVouchers').textContent = activeVouchers;
+    }
+
+    // Password Change
+    async function handleChangePassword(e) {
+      e.preventDefault();
+      const oldPassword = document.getElementById('oldPassword').value;
+      const newPassword = document.getElementById('newPassword').value;
+      const confirmNew = document.getElementById('confirmNewPassword').value;
+
+      if (newPassword !== confirmNew) {
+        showToast('New passwords do not match', 'error');
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/admin/change-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ oldPassword, newPassword })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          showToast('Password updated successfully!');
+          e.target.reset();
+        } else {
+          showToast(data.error || 'Failed to change password', 'error');
+        }
+      } catch (err) {
+        showToast('Error changing password', 'error');
+      }
+    }
+
+    // Export Data Helper
+    function exportData(type) {
+      let data = type === 'letters' ? globalLetters : type === 'vouchers' ? globalVouchers : globalSettings;
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `luve_${type}_${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function escapeHtml(str) {
+      return String(str || '').replace(/[&<>"']/g, m => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      })[m]);
+    }
+
+    // Initial load
+    checkAuth();
+  </script>
+</body>
+</html>
