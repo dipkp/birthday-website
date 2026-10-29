@@ -638,6 +638,8 @@ async function handleApiRequest(req, res, pathname) {
 
 function renderLetterShell(locale, link, letter, hostUrl = '') {
   const recipient = letter.recipientName || 'My Love';
+  const canonicalUrl = hostUrl ? (hostUrl + '/' + locale + '/letter/' + link) : ('/' + locale + '/letter/' + link);
+  const publicSiteUrl = hostUrl || '';
   return `<!doctype html>
 <html lang="${locale}-US" dir="ltr">
 <head>
@@ -672,8 +674,8 @@ r.dataset.resolvedTheme=d?'dark':'light';r.style.colorScheme=d?'dark':'light';}c
         base: "",
         env: {
           "PUBLIC_2LUV_MEDIA_BASE_URL": "",
-          "PUBLIC_SITE_URL": hostUrl || "",
-          "PUBLIC_2LUV_API_BASE_URL": hostUrl || "",
+          "PUBLIC_SITE_URL": "${publicSiteUrl}",
+          "PUBLIC_2LUV_API_BASE_URL": "${publicSiteUrl}",
           "PUBLIC_FF_PAID_LETTER_FLOW": false
         }
       };
@@ -708,7 +710,7 @@ r.dataset.resolvedTheme=d?'dark':'light';r.style.colorScheme=d?'dark':'light';}c
                 link: "${link}",
                 context: {
                   locale: "${locale}",
-                  canonicalUrl: hostUrl ? `${hostUrl}/${locale}/letter/${link}` : `/${locale}/letter/${link}`
+                  canonicalUrl: "${canonicalUrl}"
                 },
                 dictionary: {},
                 initiallyOpen: false,
@@ -759,6 +761,7 @@ function serveStaticFile(req, res, pathname) {
         photos: [],
         musicUrl: ''
       };
+    }
     const proto = req.headers['x-forwarded-proto'] || 'http';
     const host = req.headers.host ? `${proto}://${req.headers.host}` : '';
     const html = renderLetterShell(locale, link, letter, host);
