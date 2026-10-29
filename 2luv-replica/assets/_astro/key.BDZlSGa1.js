@@ -1,0 +1,1 @@
+import{b8 as t,B as c,C as i,D as y,I as f}from"./branches.C5CiuufJ.js";const b=Symbol("NaN");function h(e,r,n){i&&y();var s=new f(e),o=!t();c(()=>{var a=r();a!==a&&(a=b),o&&a!==null&&typeof a=="object"&&(a={}),s.ensure(a,n)})}export{h as k};

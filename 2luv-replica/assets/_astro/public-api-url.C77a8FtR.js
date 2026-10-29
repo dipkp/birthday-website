@@ -1,0 +1,1 @@
+const i={PUBLIC_2LUV_API_BASE_URL:"http://127.0.0.1:8788"},n=i,s=n.PUBLIC_2LUV_API_BASE_URL.replace(/\/$/,"");function e(_){const t=_==="/api"?"/api":_.startsWith("/api/")?_:`/api${_.startsWith("/")?_:`/${_}`}`;return`${s}${t}`}export{e as p};

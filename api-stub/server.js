@@ -731,7 +731,19 @@ r.dataset.resolvedTheme=d?'dark':'light';r.style.colorScheme=d?'dark':'light';}c
 
 function serveStaticFile(req, res, pathname) {
   let decoded = decodeURIComponent(pathname);
-  if (decoded === '/' || decoded === '') decoded = '/home/index.html';
+  if (decoded === '/' || decoded === '') decoded = '/index.html';
+
+  if (decoded === '/create' || decoded === '/create/' || decoded === '/create/index.html' || decoded === '/en/create' || decoded === '/en/create/') {
+    res.writeHead(302, { 'Location': '/en/create/birthday-party/' });
+    return res.end();
+  }
+
+  // Ensure directories have a trailing slash for proper relative asset resolution
+  let dirCandidate = path.join(REPLICA_DIR, decoded.replace(/^\//, '').replace(/\//g, path.sep));
+  if (fs.existsSync(dirCandidate) && fs.statSync(dirCandidate).isDirectory() && !pathname.endsWith('/')) {
+    res.writeHead(301, { 'Location': pathname + '/' });
+    return res.end();
+  }
 
   // Dynamic Letter Pages
   const letterMatch = decoded.match(/^\/(?:([a-z]{2}(?:-[a-z]{2})?)\/)?letter\/([^\/\.]+)\/?$/i);
@@ -782,7 +794,21 @@ function serveStaticFile(req, res, pathname) {
   } else if (!fs.existsSync(filePath)) {
     // Try adding index.html
     const candidate = path.join(filePath, 'index.html');
-    if (fs.existsSync(candidate)) filePath = candidate;
+    if (fs.existsSync(candidate)) {
+      filePath = candidate;
+    } else {
+      // Asset fallbacks: strip locale prefix if present
+      const clean = decoded.replace(/^\/[a-z]{2}(?:-[a-z]{2})?\//, '/');
+      const altFile = path.join(REPLICA_DIR, clean.replace(/^\//, '').replace(/\//g, path.sep));
+      if (fs.existsSync(altFile) && !fs.statSync(altFile).isDirectory()) {
+        filePath = altFile;
+      } else {
+        const altAssets = path.join(REPLICA_DIR, 'assets', clean.replace(/^\//, '').replace(/\//g, path.sep));
+        if (fs.existsSync(altAssets) && !fs.statSync(altAssets).isDirectory()) {
+          filePath = altAssets;
+        }
+      }
+    }
   }
 
   if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {

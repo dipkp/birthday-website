@@ -1,0 +1,1 @@
+function n(e,t){return e.replace(/\{([a-zA-Z]+)\}/g,(l,r)=>Object.prototype.hasOwnProperty.call(t,r)?String(t[r]):l)}function o(e,t,l){let r="other";try{r=new Intl.PluralRules(l).select(t)}catch{r=t===1?"one":"other"}return n(e[r]||e.other,{count:new Intl.NumberFormat(l).format(t)})}export{n as f,o as p};

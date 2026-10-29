@@ -1,0 +1,18 @@
+{
+  "letter": {
+    "formatted": "₹ 199.00",
+    "priceAmount": 199,
+    "currency": "INR"
+  },
+  "bundle": {
+    "formattedBundle": "₹ 299.00"
+  },
+  "themes": {
+    "party": {
+      "formatted": "₹ 299.00",
+      "priceAmount": 299,
+      "currency": "INR"
+    }
+  },
+  "regionCode": "IN"
+}

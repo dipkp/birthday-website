@@ -1,0 +1,1 @@
+import{l,I as d,f as c,g as p,j as i,k as $,m as f}from"./x-yhwoFgYm.js";function u(t,e){const a=l(e,["children","$$slots","$$events","$$legacy"]);const o=[["path",{d:"m12 19-7-7 7-7"}],["path",{d:"M19 12H5"}]];d(t,c({name:"arrow-left"},()=>a,{get iconNode(){return o},children:(r,m)=>{var s=p(),n=i(s);$(n,e,"default",{},null),f(r,s)},$$slots:{default:!0}}))}export{u as A};

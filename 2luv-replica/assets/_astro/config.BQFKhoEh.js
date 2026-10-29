@@ -1,0 +1,1 @@
+const e=["en","pt","es","fr","de","zh","zh-tw","ar","ms","ja","ru","ko"],o=e,r={en:"en-US",pt:"pt-BR",es:"es-ES",fr:"fr-FR",de:"de-DE",zh:"zh-CN","zh-tw":"zh-TW",ar:"ar-SA",ms:"ms-MY",ja:"ja-JP",ru:"ru-RU",ko:"ko-KR"};function t(s){return!!(s&&e.includes(s))}export{r as D,t as i,o as s};

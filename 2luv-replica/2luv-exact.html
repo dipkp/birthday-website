@@ -1,0 +1,1363 @@
+<!doctype html>
+<html lang="en-US" dir="ltr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#ec4899" />
+  <title>Birthday Website Maker with Photos & Music | 2luv</title>
+  <style>
+    :root {
+      --cv2-fg: #f3e4c9;
+      --cv2-fg-muted: #c1ae91;
+      --cv2-border: #b7915660;
+      --cv2-surface: #1e1712;
+      --cv2-surface-strong: #2a211a;
+      --cv2-accent-pink: #ec4899;
+      --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-serif: Georgia, 'Times New Roman', serif;
+    }
+    
+    .dark {
+      --cv2-fg: #f3e4c9;
+      --cv2-fg-muted: #c1ae91;
+      --cv2-border: #b7915660;
+      --cv2-surface: #1e1712;
+      --cv2-surface-strong: #2a211a;
+    }
+    
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      font-family: var(--font-sans);
+      background: var(--cv2-surface);
+      color: var(--cv2-fg);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+    
+    /* Consent Banner */
+    .consent-banner {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: var(--cv2-surface-strong);
+      border-top: 1px solid var(--cv2-border);
+      padding: 1rem;
+      z-index: 1000;
+    }
+    
+    .consent-content {
+      max-width: 800px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+    }
+    
+    .consent-text {
+      font-size: 0.875rem;
+      color: var(--cv2-fg-muted);
+    }
+    
+    .consent-actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+    
+    .consent-btn {
+      padding: 0.5rem 1rem;
+      border-radius: 999px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--cv2-border);
+      background: transparent;
+      color: var(--cv2-fg);
+    }
+    
+    .consent-btn.primary {
+      background: var(--cv2-accent-pink);
+      border-color: var(--cv2-accent-pink);
+      color: white;
+    }
+    
+    /* Header */
+    .header {
+      position: sticky;
+      top: 0;
+      background: rgba(30, 23, 18, 0.95);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--cv2-border);
+      padding: 0.75rem 1rem;
+      z-index: 100;
+    }
+    
+    .header-inner {
+      max-width: 800px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .logo {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--cv2-accent-pink);
+      text-decoration: none;
+      font-family: var(--font-serif);
+    }
+    
+    .header-nav {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+    }
+    
+    .nav-link {
+      color: var(--cv2-fg-muted);
+      text-decoration: none;
+      font-size: 0.9375rem;
+      padding: 0.5rem 1rem;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      transition: all 0.2s;
+    }
+    
+    .nav-link:hover {
+      color: var(--cv2-fg);
+      border-color: var(--cv2-border);
+      background: var(--cv2-surface-strong);
+    }
+    
+    /* Steps */
+    .steps {
+      display: flex;
+      justify-content: center;
+      gap: 0.5rem;
+      margin: 1.5rem 0;
+    }
+    
+    .step {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      border-radius: 999px;
+      border: 1px solid var(--cv2-border);
+      opacity: 0.4;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .step.active {
+      opacity: 1;
+      border-color: var(--cv2-accent-pink);
+      background: rgba(236, 72, 153, 0.1);
+    }
+    
+    .step.completed {
+      opacity: 0.7;
+    }
+    
+    .step-num {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--cv2-surface-strong);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8125rem;
+      font-weight: 600;
+    }
+    
+    .step.active .step-num {
+      background: var(--cv2-accent-pink);
+      color: white;
+    }
+    
+    .step-label {
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+    
+    /* Main Layout */
+    .container {
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 0 1rem 6rem;
+    }
+    
+    /* Example Link */
+    .example-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--cv2-fg-muted);
+      text-decoration: none;
+      font-size: 0.875rem;
+      margin-bottom: 1.5rem;
+      padding: 0.5rem 1rem;
+      border-radius: 999px;
+      border: 1px solid var(--cv2-border);
+      transition: all 0.2s;
+    }
+    
+    .example-link:hover {
+      background: var(--cv2-surface-strong);
+      color: var(--cv2-fg);
+    }
+    
+    /* Header Text */
+    .hero-text {
+      margin-bottom: 2rem;
+    }
+    
+    .hero-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      line-height: 1.3;
+    }
+    
+    .hero-subtitle {
+      color: var(--cv2-fg-muted);
+      font-size: 0.9375rem;
+      line-height: 1.6;
+    }
+    
+    /* Form Sections */
+    .form-section {
+      margin-bottom: 2rem;
+    }
+    
+    .form-label {
+      display: block;
+      font-size: 0.6875rem;
+      font-weight: 700;
+      color: var(--cv2-fg-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      margin-bottom: 0.5rem;
+    }
+    
+    .form-input {
+      width: 100%;
+      padding: 0.875rem 1rem;
+      background: var(--cv2-surface-strong);
+      border: 1px solid var(--cv2-border);
+      border-radius: 12px;
+      color: var(--cv2-fg);
+      font-size: 1rem;
+      font-family: var(--font-sans);
+      transition: all 0.2s;
+    }
+    
+    .form-input:focus {
+      outline: none;
+      border-color: var(--cv2-accent-pink);
+      box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.15);
+    }
+    
+    .form-input::placeholder {
+      color: var(--cv2-fg-muted);
+      opacity: 0.6;
+    }
+    
+    .char-hint {
+      text-align: right;
+      font-size: 0.75rem;
+      color: var(--cv2-fg-muted);
+      margin-top: 0.375rem;
+    }
+    
+    .form-help {
+      font-size: 0.8125rem;
+      color: var(--cv2-fg-muted);
+      margin-top: 0.5rem;
+      line-height: 1.5;
+    }
+    
+    /* Theme Selector */
+    .theme-trigger {
+      display: flex;
+      width: 100%;
+      min-height: 44px;
+      align-items: center;
+      gap: 10px;
+      padding: 0 14px 0 7px;
+      background: var(--cv2-surface-strong);
+      border: 1px solid var(--cv2-border);
+      border-radius: 999px;
+      color: var(--cv2-fg);
+      font: inherit;
+      text-align: start;
+      cursor: pointer;
+      transition: border-color 160ms ease, box-shadow 160ms ease;
+    }
+    
+    .theme-trigger:hover {
+      border-color: color-mix(in srgb, var(--cv2-fg) 22%, transparent);
+    }
+    
+    .theme-trigger:focus-visible {
+      outline: 3px solid color-mix(in srgb, var(--cv2-accent-pink) 55%, transparent);
+      outline-offset: 2px;
+    }
+    
+    .theme-art {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #ff6b6b, #feca57);
+      flex: none;
+      overflow: hidden;
+      border: 1px solid var(--cv2-border);
+    }
+    
+    .theme-info {
+      flex: 1;
+      min-width: 0;
+    }
+    
+    .theme-eyebrow {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--cv2-fg-muted);
+      line-height: 1.1;
+    }
+    
+    .theme-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--cv2-fg);
+      line-height: 1.2;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    
+    .theme-change {
+      display: inline-flex;
+      height: 20px;
+      align-items: center;
+      gap: 5px;
+      margin-inline-start: auto;
+      border-inline-start: 1px solid var(--cv2-border);
+      padding-inline-start: 11px;
+      color: color-mix(in srgb, var(--cv2-accent-pink) 74%, var(--cv2-fg));
+      font-size: 13px;
+      font-weight: 600;
+    }
+    
+    /* Theme Grid */
+    .theme-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+    
+    @media (max-width: 480px) {
+      .theme-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+    
+    .theme-card {
+      position: relative;
+      aspect-ratio: 1;
+      border-radius: 12px;
+      overflow: hidden;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: all 0.2s;
+    }
+    
+    .theme-card:hover {
+      transform: scale(1.05);
+    }
+    
+    .theme-card.selected {
+      border-color: var(--cv2-accent-pink);
+    }
+    
+    .theme-thumb {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+    }
+    
+    .theme-card-label {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 0.25rem;
+      background: linear-gradient(transparent, rgba(0,0,0,0.8));
+      font-size: 0.6875rem;
+      font-weight: 600;
+      text-align: center;
+    }
+    
+    /* Theme backgrounds */
+    .theme-birthday-party { background: linear-gradient(135deg, #ff6b6b, #feca57); }
+    .theme-3d-cake { background: linear-gradient(135deg, #ff9ff3, #f368e0); }
+    .theme-balloons { background: linear-gradient(135deg, #54a0ff, #5f27cd); }
+    .theme-romantic { background: linear-gradient(135deg, #ff6b6b, #ee5a24); }
+    .theme-fireworks { background: linear-gradient(135deg, #f368e0, #ffbe76); }
+    .theme-baby { background: linear-gradient(135deg, #7bed9f, #70a1ff); }
+    .theme-christmas { background: linear-gradient(135deg, #ff3838, #2ed573); }
+    .theme-love-letter { background: linear-gradient(135deg, #ff6b81, #ff4757); }
+    
+    /* Date Picker */
+    .date-picker {
+      display: flex;
+      gap: 0.75rem;
+    }
+    
+    .date-field {
+      flex: 1;
+    }
+    
+    .date-field label {
+      display: block;
+      font-size: 0.6875rem;
+      color: var(--cv2-fg-muted);
+      margin-bottom: 0.25rem;
+      text-transform: uppercase;
+    }
+    
+    .date-field input,
+    .date-field select {
+      width: 100%;
+      padding: 0.75rem;
+      background: var(--cv2-surface-strong);
+      border: 1px solid var(--cv2-border);
+      border-radius: 8px;
+      color: var(--cv2-fg);
+      font-size: 1rem;
+      text-align: center;
+    }
+    
+    .date-field input:focus,
+    .date-field select:focus {
+      outline: none;
+      border-color: var(--cv2-accent-pink);
+    }
+    
+    .date-hint {
+      margin-top: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--cv2-fg-muted);
+      font-size: 0.875rem;
+    }
+    
+    .date-toggle {
+      background: transparent;
+      border: none;
+      color: var(--cv2-accent-pink);
+      font-size: 0.875rem;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+    
+    /* Buttons */
+    .btn-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-top: 2rem;
+    }
+    
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      min-height: 44px;
+      padding: 0.875rem 1.5rem;
+      border-radius: 12px;
+      font-size: 0.9375rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: 1px solid var(--cv2-border);
+      background: var(--cv2-surface-strong);
+      color: var(--cv2-fg);
+    }
+    
+    .btn:hover {
+      background: var(--cv2-border);
+    }
+    
+    .btn:focus-visible {
+      outline: 2px solid currentColor;
+      outline-offset: 2px;
+    }
+    
+    .btn-primary {
+      background: var(--cv2-accent-pink);
+      border-color: var(--cv2-accent-pink);
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      background: #db2777;
+      border-color: #db2777;
+    }
+    
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    /* Help Section */
+    .help-section {
+      margin-top: 2rem;
+      border-top: 1px solid var(--cv2-border);
+      padding-top: 1.5rem;
+    }
+    
+    .help-section details {
+      margin-top: 1rem;
+    }
+    
+    .help-section summary {
+      font-size: 0.9375rem;
+      font-weight: 600;
+      cursor: pointer;
+      color: var(--cv2-fg-muted);
+    }
+    
+    .help-section summary:hover {
+      color: var(--cv2-fg);
+    }
+    
+    .help-content {
+      margin-top: 1rem;
+      font-size: 0.875rem;
+      color: var(--cv2-fg-muted);
+      line-height: 1.7;
+    }
+    
+    /* Step Content */
+    .step-content {
+      display: none;
+    }
+    
+    .step-content.active {
+      display: block;
+    }
+    
+    /* Preview Card */
+    .preview-card {
+      position: relative;
+      aspect-ratio: 9/16;
+      max-height: 500px;
+      margin: 0 auto;
+      border-radius: 16px;
+      overflow: hidden;
+      background: radial-gradient(72% 72% at 50% 40%, #4a1d45 0%, #2a1030 48%, #150a17 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      text-align: center;
+    }
+    
+    .preview-eyebrow {
+      color: #ffd36e;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      margin-bottom: 0.5rem;
+    }
+    
+    .preview-title {
+      background: linear-gradient(95deg, #ffb46b 0%, #ff6f91 48%, #c77dff 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      font-family: var(--font-serif);
+      font-size: clamp(1.5rem, 5vw, 2.5rem);
+      font-weight: 600;
+      line-height: 1.1;
+      margin-bottom: 1rem;
+    }
+    
+    .preview-message {
+      color: var(--cv2-fg-muted);
+      font-size: 0.9375rem;
+      max-width: 400px;
+      line-height: 1.6;
+      margin-bottom: 1.5rem;
+    }
+    
+    .preview-countdown {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+    
+    .countdown-item {
+      display: grid;
+      place-items: center;
+      min-width: 40px;
+      height: 40px;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 999px;
+      padding: 0 0.75rem;
+      background: rgba(255, 255, 255, 0.08);
+      color: white;
+      font-size: 1rem;
+      font-weight: 700;
+    }
+    
+    /* QR Code */
+    .qr-section {
+      text-align: center;
+      margin: 2rem 0;
+    }
+    
+    .qr-container {
+      display: inline-block;
+      background: white;
+      padding: 1rem;
+      border-radius: 12px;
+    }
+    
+    .qr-label {
+      color: var(--cv2-fg-muted);
+      font-size: 0.8125rem;
+      margin-top: 0.75rem;
+    }
+    
+    /* Animations */
+    .animation-toggles {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    
+    .anim-toggle {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1rem;
+      background: var(--cv2-surface-strong);
+      border-radius: 12px;
+      border: 1px solid var(--cv2-border);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .anim-toggle:hover {
+      border-color: var(--cv2-accent-pink);
+    }
+    
+    .anim-toggle.active {
+      border-color: var(--cv2-accent-pink);
+      background: rgba(236, 72, 153, 0.1);
+    }
+    
+    .anim-icon {
+      font-size: 1.25rem;
+    }
+    
+    .anim-label {
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+    
+    .toggle-switch {
+      width: 36px;
+      height: 20px;
+      background: var(--cv2-border);
+      border-radius: 10px;
+      position: relative;
+      margin-left: auto;
+      transition: background 0.2s;
+    }
+    
+    .anim-toggle.active .toggle-switch {
+      background: var(--cv2-accent-pink);
+    }
+    
+    .toggle-switch::after {
+      content: '';
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      background: white;
+      border-radius: 50%;
+      top: 2px;
+      left: 2px;
+      transition: transform 0.2s;
+    }
+    
+    .anim-toggle.active .toggle-switch::after {
+      transform: translateX(16px);
+    }
+    
+    /* Message Editor */
+    .message-editor {
+      background: var(--cv2-surface-strong);
+      border: 1px solid var(--cv2-border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    
+    .editor-toolbar {
+      display: flex;
+      gap: 0.5rem;
+      padding: 0.75rem;
+      border-bottom: 1px solid var(--cv2-border);
+    }
+    
+    .toolbar-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      border: 1px solid var(--cv2-border);
+      background: transparent;
+      color: var(--cv2-fg);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+    }
+    
+    .toolbar-btn:hover {
+      background: var(--cv2-surface);
+    }
+    
+    .editor-content {
+      padding: 1rem;
+      min-height: 120px;
+      outline: none;
+      color: var(--cv2-fg);
+      line-height: 1.6;
+    }
+    
+    /* Photo Upload */
+    .photo-upload-area {
+      border: 2px dashed var(--cv2-border);
+      border-radius: 16px;
+      padding: 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .photo-upload-area:hover {
+      border-color: var(--cv2-accent-pink);
+      background: rgba(236, 72, 153, 0.05);
+    }
+    
+    .upload-icon {
+      font-size: 2.5rem;
+      margin-bottom: 0.5rem;
+    }
+    
+    .upload-label {
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+    
+    .upload-hint {
+      font-size: 0.8125rem;
+      color: var(--cv2-fg-muted);
+    }
+    
+    .photo-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+    
+    .photo-item {
+      aspect-ratio: 1;
+      border-radius: 8px;
+      overflow: hidden;
+      position: relative;
+    }
+    
+    .photo-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    
+    .photo-remove {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.7);
+      color: white;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+    }
+    
+    /* Music Upload */
+    .music-upload {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 1rem;
+      background: var(--cv2-surface-strong);
+      border-radius: 12px;
+      border: 1px solid var(--cv2-border);
+    }
+    
+    .music-icon {
+      font-size: 2rem;
+    }
+    
+    .music-info {
+      flex: 1;
+    }
+    
+    .music-name {
+      font-weight: 500;
+      margin-bottom: 0.25rem;
+    }
+    
+    .music-hint {
+      font-size: 0.8125rem;
+      color: var(--cv2-fg-muted);
+    }
+    
+    .music-upload-btn {
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      border: 1px solid var(--cv2-border);
+      background: transparent;
+      color: var(--cv2-fg);
+      cursor: pointer;
+      font-size: 0.875rem;
+    }
+    
+    /* Footer */
+    .footer {
+      text-align: center;
+      padding: 2rem 1rem;
+      color: var(--cv2-fg-muted);
+      font-size: 0.75rem;
+      border-top: 1px solid var(--cv2-border);
+    }
+  </style>
+</head>
+<body>
+  <!-- Consent Banner -->
+  <div class="consent-banner" data-consent-ssr="true">
+    <div class="consent-content">
+      <p class="consent-text">We use cookies to improve your experience, remember your preferences, and personalize your browsing.</p>
+      <div class="consent-actions">
+        <button class="consent-btn" data-consent-action="reject">Reject optional</button>
+        <button class="consent-btn" data-consent-action="customize">Customize</button>
+        <button class="consent-btn primary" data-consent-action="accept">Accept all</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Header -->
+  <header class="header">
+    <div class="header-inner">
+      <a href="#" class="logo">2luv</a>
+      <nav class="header-nav">
+        <a href="#" class="nav-link">See an example</a>
+      </nav>
+    </div>
+  </header>
+  
+  <!-- Steps -->
+  <div class="steps">
+    <div class="step active" id="step1-tab" onclick="goToStep(1)">
+      <div class="step-num">1</div>
+      <span class="step-label">Birthday</span>
+    </div>
+    <div class="step" id="step2-tab" onclick="goToStep(2)">
+      <div class="step-num">2</div>
+      <span class="step-label">Surprises</span>
+    </div>
+    <div class="step" id="step3-tab" onclick="goToStep(3)">
+      <div class="step-num">3</div>
+      <span class="step-label">Send</span>
+    </div>
+  </div>
+  
+  <!-- Main Content -->
+  <main class="container">
+    <!-- Step 1: Birthday -->
+    <div class="step-content active" id="step1">
+      <a href="#" class="example-link">
+        <span>👁</span> See an example
+      </a>
+      
+      <div class="hero-text">
+        <h1 class="hero-title">Create a birthday website with photos and music</h1>
+        <p class="hero-subtitle">Write your birthday wishes, add photos and a song, and preview your gift. Birthday Party starts with a 3D cake that opens your letter and surprises; share it by link or QR code.</p>
+      </div>
+      
+      <!-- Who is Celebrating -->
+      <div class="form-section">
+        <label class="form-label" for="celebrantName">WHO IS CELEBRATING?</label>
+        <input type="text" class="form-input" id="celebrantName" placeholder="Enter name..." maxlength="150" oninput="updateCharCount(this)">
+        <div class="char-hint"><span id="nameCount">0</span> / 150</div>
+        <p class="form-help">It puts the age on the cake and counts down to the big day.</p>
+      </div>
+      
+      <!-- Who is Throwing -->
+      <div class="form-section">
+        <label class="form-label" for="senderName">WHO IS THROWING THE PARTY?</label>
+        <input type="text" class="form-input" id="senderName" placeholder="Optional">
+      </div>
+      
+      <!-- Theme -->
+      <div class="form-section">
+        <label class="form-label">THEME</label>
+        <button class="theme-trigger" onclick="toggleThemeGrid()">
+          <div class="theme-art theme-birthday-party"></div>
+          <div class="theme-info">
+            <div class="theme-eyebrow">THEME</div>
+            <div class="theme-name">Birthday party</div>
+          </div>
+          <span class="theme-change">Change</span>
+        </button>
+        
+        <div class="theme-grid" id="themeGrid" style="display: none;">
+          <div class="theme-card selected" data-theme="birthday-party" onclick="selectTheme(this)">
+            <div class="theme-thumb">🎂</div>
+            <div class="theme-card-label">Birthday Party</div>
+          </div>
+          <div class="theme-card" data-theme="3d-cake" onclick="selectTheme(this)">
+            <div class="theme-thumb">🎁</div>
+            <div class="theme-card-label">3D Cake</div>
+          </div>
+          <div class="theme-card" data-theme="balloons" onclick="selectTheme(this)">
+            <div class="theme-thumb">🎈</div>
+            <div class="theme-card-label">Balloons</div>
+          </div>
+          <div class="theme-card" data-theme="romantic" onclick="selectTheme(this)">
+            <div class="theme-thumb">❤️</div>
+            <div class="theme-card-label">Romantic</div>
+          </div>
+          <div class="theme-card" data-theme="fireworks" onclick="selectTheme(this)">
+            <div class="theme-thumb">🎆</div>
+            <div class="theme-card-label">Fireworks</div>
+          </div>
+          <div class="theme-card" data-theme="baby" onclick="selectTheme(this)">
+            <div class="theme-thumb">👶</div>
+            <div class="theme-card-label">Baby Birthday</div>
+          </div>
+          <div class="theme-card" data-theme="christmas" onclick="selectTheme(this)">
+            <div class="theme-thumb">🎄</div>
+            <div class="theme-card-label">Christmas</div>
+          </div>
+          <div class="theme-card" data-theme="love-letter" onclick="selectTheme(this)">
+            <div class="theme-thumb">💌</div>
+            <div class="theme-card-label">Love Letter</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Birthday Date -->
+      <div class="form-section">
+        <label class="form-label">BIRTHDAY DATE</label>
+        <div class="date-picker">
+          <div class="date-field">
+            <label>Day</label>
+            <input type="number" id="birthDay" min="1" max="31" value="" placeholder="/">
+          </div>
+          <div class="date-field">
+            <label>Month</label>
+            <input type="number" id="birthMonth" min="1" max="12" value="" placeholder="/">
+          </div>
+          <div class="date-field">
+            <label>Year</label>
+            <input type="number" id="birthYear" min="1900" max="2099" value="" placeholder="/">
+          </div>
+        </div>
+        <button class="date-toggle" onclick="toggleUnknownYear()">I don't know the birth year</button>
+      </div>
+      
+      <div class="btn-row">
+        <button class="btn" disabled>← Back</button>
+        <button class="btn btn-primary" data-2luv-creator-next onclick="nextStep()">Next →</button>
+      </div>
+      
+      <!-- Help -->
+      <div class="help-section">
+        <details>
+          <summary>Help creating your birthday website</summary>
+          <div class="help-content">
+            <h2>How to create a birthday website</h2>
+            <p>Create a free birthday website in a few minutes. Choose your theme, add the celebrant's name, select the birthday date, and share the link or QR code.</p>
+          </div>
+        </details>
+      </div>
+    </div>
+    
+    <!-- Step 2: Surprises -->
+    <div class="step-content" id="step2">
+      <a href="#" class="example-link">
+        <span>👁</span> See an example
+      </a>
+      
+      <div class="hero-text">
+        <h1 class="hero-title">Add your surprises</h1>
+        <p class="hero-subtitle">Upload photos, add music, and write your personal message.</p>
+      </div>
+      
+      <!-- Photos -->
+      <div class="form-section">
+        <label class="form-label">PHOTOS <span style="font-weight: normal; color: var(--cv2-fg-muted);">(up to 15)</span></label>
+        <div class="photo-upload-area" onclick="document.getElementById('photoInput').click()">
+          <div class="upload-icon">📷</div>
+          <div class="upload-label">Click to upload photos</div>
+          <div class="upload-hint">JPG, PNG, WebP supported</div>
+        </div>
+        <input type="file" id="photoInput" accept="image/*" multiple style="display: none;" onchange="handlePhotos(event)">
+        <div class="photo-grid" id="photoGrid"></div>
+      </div>
+      
+      <!-- Music -->
+      <div class="form-section">
+        <label class="form-label">MUSIC</label>
+        <div class="music-upload">
+          <span class="music-icon">🎵</span>
+          <div class="music-info">
+            <div class="music-name" id="musicName">No music selected</div>
+            <div class="music-hint">MP3, WAV supported</div>
+          </div>
+          <button class="music-upload-btn" onclick="document.getElementById('musicInput').click()">Choose File</button>
+        </div>
+        <input type="file" id="musicInput" accept="audio/*" style="display: none;" onchange="handleMusic(event)">
+      </div>
+      
+      <!-- Message -->
+      <div class="form-section">
+        <label class="form-label">YOUR MESSAGE</label>
+        <div class="message-editor">
+          <div class="editor-toolbar">
+            <button class="toolbar-btn" onclick="formatText('bold')"><b>B</b></button>
+            <button class="toolbar-btn" onclick="formatText('italic')"><i>I</i></button>
+            <button class="toolbar-btn" onclick="formatText('underline')"><u>U</u></button>
+            <button class="toolbar-btn" onclick="insertEmoji('🎂')">🎂</button>
+            <button class="toolbar-btn" onclick="insertEmoji('❤️')">❤️</button>
+            <button class="toolbar-btn" onclick="insertEmoji('✨')">✨</button>
+          </div>
+          <div class="editor-content" id="messageEditor" contenteditable="true"></div>
+        </div>
+      </div>
+      
+      <!-- Animations -->
+      <div class="form-section">
+        <label class="form-label">ANIMATIONS</label>
+        <div class="animation-toggles">
+          <div class="anim-toggle active" onclick="toggleAnim(this)">
+            <span class="anim-icon">🎆</span>
+            <span class="anim-label">Fireworks</span>
+            <div class="toggle-switch"></div>
+          </div>
+          <div class="anim-toggle active" onclick="toggleAnim(this)">
+            <span class="anim-icon">🎈</span>
+            <span class="anim-label">Balloons</span>
+            <div class="toggle-switch"></div>
+          </div>
+          <div class="anim-toggle" onclick="toggleAnim(this)">
+            <span class="anim-icon">🎊</span>
+            <span class="anim-label">Confetti</span>
+            <div class="toggle-switch"></div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="btn-row">
+        <button class="btn" onclick="prevStep()">← Back</button>
+        <button class="btn btn-primary" data-2luv-creator-next onclick="nextStep()">Preview →</button>
+      </div>
+    </div>
+    
+    <!-- Step 3: Send -->
+    <div class="step-content" id="step3">
+      <div class="hero-text" style="text-align: center;">
+        <h1 class="hero-title">Your birthday gift</h1>
+        <p class="hero-subtitle">Preview your creation, then unlock to share.</p>
+      </div>
+      
+      <!-- Preview -->
+      <div class="preview-card" id="previewCard">
+        <div class="preview-eyebrow">HAPPY BIRTHDAY</div>
+        <h2 class="preview-title" id="previewTitle">Happy Birthday!</h2>
+        <p class="preview-message" id="previewMessage">Your message will appear here</p>
+        <div class="preview-countdown">
+          <div class="countdown-item" id="countDays">0</div>
+          <div class="countdown-item" id="countHours">0</div>
+          <div class="countdown-item" id="countMinutes">0</div>
+          <div class="countdown-item" id="countSeconds">0</div>
+        </div>
+      </div>
+      
+      <!-- QR Code -->
+      <div class="qr-section">
+        <div class="qr-container" id="qrCode"></div>
+        <p class="qr-label">Scan to open on phone</p>
+      </div>
+      
+      <div class="btn-row">
+        <button class="btn" onclick="prevStep()">← Edit</button>
+        <button class="btn btn-primary" onclick="unlockGift()">🔓 Unlock & Share</button>
+      </div>
+      
+      <p style="text-align: center; color: var(--cv2-fg-muted); font-size: 0.8125rem; margin-top: 1rem;">
+        Preview is free. Pay to unlock and share the link.
+      </p>
+    </div>
+  </main>
+  
+  <!-- Footer -->
+  <footer class="footer">
+    <p>© 2025-2026 2luv. All rights reserved.</p>
+    <p style="margin-top: 0.5rem;">2 PROJECTS LTDA | Imperatriz - MA | Brazil</p>
+  </footer>
+  
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <script>
+    let currentStep = 1;
+    let selectedTheme = 'birthday-party';
+    let photos = [];
+    let unknownYear = false;
+    
+    // Cookie consent
+    document.querySelectorAll('[data-consent-action]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelector('.consent-banner').style.display = 'none';
+        document.documentElement.setAttribute('data-2luv-consent-stored', '');
+      });
+    });
+    
+    // Theme grid toggle
+    function toggleThemeGrid() {
+      const grid = document.getElementById('themeGrid');
+      grid.style.display = grid.style.display === 'none' ? 'grid' : 'none';
+    }
+    
+    // Select theme
+    function selectTheme(el) {
+      document.querySelectorAll('.theme-card').forEach(card => card.classList.remove('selected'));
+      el.classList.add('selected');
+      selectedTheme = el.dataset.theme;
+      
+      // Update trigger
+      const trigger = document.querySelector('.theme-trigger .theme-name');
+      trigger.textContent = el.querySelector('.theme-card-label').textContent;
+      
+      const triggerArt = document.querySelector('.theme-art');
+      triggerArt.className = 'theme-art theme-' + selectedTheme;
+      
+      document.getElementById('themeGrid').style.display = 'none';
+    }
+    
+    // Character counter
+    function updateCharCount(input) {
+      document.getElementById('nameCount').textContent = input.value.length;
+    }
+    
+    // Photo handling
+    function handlePhotos(event) {
+      const files = Array.from(event.target.files);
+      files.forEach(file => {
+        if (photos.length < 15) {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            photos.push(e.target.result);
+            renderPhotos();
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+    }
+    
+    function renderPhotos() {
+      const grid = document.getElementById('photoGrid');
+      grid.innerHTML = photos.map((src, i) => `
+        <div class="photo-item">
+          <img src="${src}" alt="Photo ${i + 1}">
+          <button class="photo-remove" onclick="removePhoto(${i})">✕</button>
+        </div>
+      `).join('');
+    }
+    
+    function removePhoto(index) {
+      photos.splice(index, 1);
+      renderPhotos();
+    }
+    
+    // Music handling
+    function handleMusic(event) {
+      const file = event.target.files[0];
+      if (file) {
+        document.getElementById('musicName').textContent = file.name;
+      }
+    }
+    
+    // Text formatting
+    function formatText(command) {
+      document.execCommand(command, false, null);
+      document.getElementById('messageEditor').focus();
+    }
+    
+    function insertEmoji(emoji) {
+      document.execCommand('insertText', false, emoji);
+    }
+    
+    // Animation toggle
+    function toggleAnim(el) {
+      el.classList.toggle('active');
+    }
+    
+    // Unknown year toggle
+    function toggleUnknownYear() {
+      unknownYear = !unknownYear;
+      const yearInput = document.getElementById('birthYear');
+      yearInput.disabled = unknownYear;
+      yearInput.style.opacity = unknownYear ? '0.5' : '1';
+      yearInput.value = unknownYear ? '' : yearInput.value;
+    }
+    
+    // Step navigation
+    function goToStep(step) {
+      document.querySelectorAll('.step-content').forEach(c => c.classList.remove('active'));
+      document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+      
+      document.getElementById(`step${step}`).classList.add('active');
+      document.getElementById(`step${step}-tab`).classList.add('active');
+      currentStep = step;
+    }
+    
+    function nextStep() {
+      if (currentStep < 3) {
+        goToStep(currentStep + 1);
+        if (currentStep === 3) {
+          updatePreview();
+          startCountdown();
+          generateQR();
+        }
+      }
+    }
+    
+    function prevStep() {
+      if (currentStep > 1) {
+        goToStep(currentStep - 1);
+      }
+    }
+    
+    // Update preview
+    function updatePreview() {
+      const name = document.getElementById('celebrantName').value.trim();
+      const message = document.getElementById('messageEditor').innerHTML || 'Your message will appear here';
+      
+      document.getElementById('previewTitle').textContent = name ? `Happy Birthday, ${name}!` : 'Happy Birthday!';
+      document.getElementById('previewMessage').innerHTML = message;
+    }
+    
+    // Countdown
+    function startCountdown() {
+      if (unknownYear) return;
+      
+      const day = parseInt(document.getElementById('birthDay').value) || 1;
+      const month = parseInt(document.getElementById('birthMonth').value) || 1;
+      const year = parseInt(document.getElementById('birthYear').value) || new Date().getFullYear();
+      
+      const birthday = new Date(year, month - 1, day);
+      const today = new Date();
+      
+      if (birthday < today) {
+        birthday.setFullYear(today.getFullYear() + 1);
+      }
+      
+      function update() {
+        const now = new Date();
+        const diff = birthday - now;
+        
+        if (diff <= 0) {
+          document.getElementById('countDays').textContent = '0';
+          document.getElementById('countHours').textContent = '0';
+          document.getElementById('countMinutes').textContent = '0';
+          document.getElementById('countSeconds').textContent = '0';
+          return;
+        }
+        
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+        
+        document.getElementById('countDays').textContent = days;
+        document.getElementById('countHours').textContent = hours;
+        document.getElementById('countMinutes').textContent = minutes;
+        document.getElementById('countSeconds').textContent = seconds;
+      }
+      
+      update();
+      setInterval(update, 1000);
+    }
+    
+    // QR Code
+    function generateQR() {
+      const qrContainer = document.getElementById('qrCode');
+      qrContainer.innerHTML = '';
+      
+      const name = document.getElementById('celebrantName').value || 'birthday';
+      const mockUrl = `https://www.2-luv.com/en/gift/${btoa(name).substring(0, 8)}`;
+      
+      if (typeof QRCode !== 'undefined') {
+        new QRCode(qrContainer, {
+          text: mockUrl,
+          width: 150,
+          height: 150,
+          colorDark: "#000000",
+          colorLight: "#ffffff",
+          correctLevel: QRCode.CorrectLevel.M
+        });
+      }
+    }
+    
+    // Unlock gift
+    function unlockGift() {
+      alert('🔓 Unlock feature would redirect to payment\n\nIn production:\n1. Open Stripe checkout\n2. Generate unique gift URL\n3. Send email with link');
+    }
+    
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+      const yearInput = document.getElementById('birthYear');
+      if (!yearInput.value) {
+        yearInput.value = new Date().getFullYear();
+      }
+    });
+  </script>
+</body>
+</html>

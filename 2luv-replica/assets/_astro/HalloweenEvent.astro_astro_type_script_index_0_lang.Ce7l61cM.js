@@ -1,0 +1,1 @@
+import{s as t}from"./pricing-region-controls.B3QK6_Sx.js";window.addEventListener("twoluv:pricing-region",e=>t(e.detail?.region));document.querySelectorAll('meta[name="theme-color"]').forEach(e=>e.setAttribute("content","#0d0b09"));
