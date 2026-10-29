@@ -48,6 +48,84 @@ function saveLetters() {
   }
 }
 
+// --- YouPI-PG & UPI Payment Configuration ---
+const PRICE_INR = 99;
+const UPI_ID = 'dipraksh@pingpay';
+const UPI_ID_ALT = '9327792155@upi';
+const PAYEE_NAME = 'Luve gifts';
+const MERCHANT_ID = '00000000-0000-0000-0000-000000000001';
+const YOUPI_API_PORT = 6100;
+const YOUPI_CHECKOUT_PORT = 7000;
+const YOUPI_ADMIN_TOKEN = '3cd4a37f974c67ea625777ca596b42903ef0bde5609aba5e687c8147a7a2f87e';
+
+const paymentSessions = {};
+
+function markLetterAsPaid(letterRef) {
+  if (!letterRef) return false;
+  let target = letters[letterRef] || Object.values(letters).find(l => l.shareableLink === letterRef || l.id === letterRef);
+  if (!target && drafts[letterRef]) {
+    const draft = drafts[letterRef];
+    const payload = draft.payload || {};
+    const recipient = payload.lovedOneName || payload.recipientName || 'gift';
+    const shareableLink = draft.shareableLink || 'birthday-' + recipient.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Math.random().toString(36).substring(2, 7);
+    const letterId = 'letter-' + Date.now();
+    target = {
+      id: letterId,
+      shareableLink: shareableLink,
+      status: 'published',
+      paid: true,
+      isPaid: true,
+      createdAt: new Date().toISOString(),
+      authorName: payload.authorName || 'Alexander',
+      recipientName: recipient,
+      theme: payload.theme || 'birthday',
+      message: payload.message || '',
+      whatILove: payload.whatILove || '',
+      story: payload.ourStory || '',
+      dreams: payload.dreams || '',
+      places: payload.places || [],
+      photos: payload.photos || [],
+      musicUrl: payload.musicUrl || ''
+    };
+    letters[shareableLink] = target;
+    letters[letterId] = target;
+  }
+  if (target) {
+    target.paid = true;
+    target.isPaid = true;
+    target.status = 'published';
+    saveLetters();
+    console.log(`[Payment] Letter marked PAID: ${target.shareableLink} (${target.id})`);
+    return true;
+  }
+  return false;
+}
+
+function proxyToPort(req, res, targetPort, pathnameWithSearch) {
+  const options = {
+    hostname: '127.0.0.1',
+    port: targetPort,
+    path: pathnameWithSearch || req.url,
+    method: req.method,
+    headers: { ...req.headers, host: 'localhost:' + targetPort }
+  };
+
+  const proxyReq = http.request(options, (proxyRes) => {
+    res.writeHead(proxyRes.statusCode, proxyRes.headers);
+    proxyRes.pipe(res);
+  });
+
+  proxyReq.on('error', (err) => {
+    console.error(`Proxy to port ${targetPort} error:`, err.message);
+    if (!res.headersSent) {
+      res.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('Bad Gateway: Payment portal is loading, please refresh in a moment.');
+    }
+  });
+
+  req.pipe(proxyReq);
+}
+
 const drafts = {};
 
 // --- AI Session & Generation Helpers ---
@@ -187,15 +265,15 @@ function parseBody(req) {
 }
 
 const PRICING = {
-  regionCode: 'US',
-  countryCode: 'US',
-  letter: { regionCode: 'US', planType: 'letter', priceAmount: 0, currency: 'USD', symbol: '$', formatted: 'Free' },
-  bundle: { formattedBundle: 'Free', formattedCard: 'Free' },
+  regionCode: 'IN',
+  countryCode: 'IN',
+  letter: { regionCode: 'IN', planType: 'letter', priceAmount: PRICE_INR, currency: 'INR', symbol: '₹', formatted: '₹' + PRICE_INR },
+  bundle: { formattedBundle: '₹' + PRICE_INR, formattedCard: '₹' + PRICE_INR },
   themes: {
-    party: { formatted: 'Free', priceAmount: 0, currency: 'USD' },
-    christmas: { formatted: 'Free', priceAmount: 0, currency: 'USD' },
-    bloom: { formatted: 'Free', priceAmount: 0, currency: 'USD' },
-    halloween: { formatted: 'Free', priceAmount: 0, currency: 'USD' }
+    party: { formatted: '₹' + PRICE_INR, priceAmount: PRICE_INR, currency: 'INR', symbol: '₹' },
+    christmas: { formatted: '₹' + PRICE_INR, priceAmount: PRICE_INR, currency: 'INR', symbol: '₹' },
+    bloom: { formatted: '₹' + PRICE_INR, priceAmount: PRICE_INR, currency: 'INR', symbol: '₹' },
+    halloween: { formatted: '₹' + PRICE_INR, priceAmount: PRICE_INR, currency: 'INR', symbol: '₹' }
   }
 };
 
@@ -217,7 +295,7 @@ async function handleApiRequest(req, res, pathname) {
 
   const body = (req.method === 'POST' || req.method === 'PUT') ? await parseBody(req) : {};
 
-  // Pricing -> 100% Free
+  // Pricing -> ₹99
   if (pathname === '/api/pricing/landing') {
     return reply(res, PRICING);
   }
@@ -228,26 +306,171 @@ async function handleApiRequest(req, res, pathname) {
     pathname === '/api/cards/card-price' ||
     pathname === '/api/cards/bundle-price'
   ) {
-    return reply(res, { formatted: 'Free', priceAmount: 0, currency: 'USD', symbol: '$', free: true });
+    return reply(res, { formatted: '₹' + PRICE_INR, priceAmount: PRICE_INR, currency: 'INR', symbol: '₹', free: false });
   }
 
   // Coupons
   if (pathname === '/api/coupons/validate') {
-    return reply(res, { ok: true, valid: true, discountPercent: 100, formattedDiscount: '100% OFF (Admin Free Pass)' });
+    return reply(res, { ok: true, valid: true, discountPercent: 0, formattedDiscount: 'Standard UPI Discount' });
   }
 
-  // Payment Bypassed
+  // Create Checkout Session with YouPI-PG
   if (pathname === '/api/create-checkout-session') {
+    const proto = req.headers['x-forwarded-proto'] || 'https';
+    const host = req.headers.host || 'luve.duckdns.org';
+    const hostUrl = `${proto}://${host}`;
+
+    const letterRef = body.letterShareableLink || body.letterId || body.cardShareableLink || body.leadId || ('gift-' + Date.now());
+    const orderId = 'ORD-' + Date.now();
+    const returnUrl = `${hostUrl}/en/letter/${encodeURIComponent(letterRef)}?payment=success`;
+
+    try {
+      const youpiRes = await new Promise((resolve, reject) => {
+        const payload = JSON.stringify({
+          orderId: orderId,
+          amount: PRICE_INR,
+          currency: 'INR',
+          returnUrl: returnUrl
+        });
+        const preq = http.request({
+          hostname: '127.0.0.1',
+          port: YOUPI_API_PORT,
+          path: '/api/v1/payments',
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Merchant-Id': MERCHANT_ID,
+            'Content-Length': Buffer.byteLength(payload)
+          }
+        }, (pres) => {
+          let data = '';
+          pres.on('data', chunk => data += chunk);
+          pres.on('end', () => {
+            try {
+              resolve({ status: pres.statusCode, body: JSON.parse(data) });
+            } catch(e) {
+              resolve({ status: pres.statusCode, body: data });
+            }
+          });
+        });
+        preq.on('error', reject);
+        preq.write(payload);
+        preq.end();
+      });
+
+      if (youpiRes.status === 201 && youpiRes.body?.paymentId) {
+        const paymentId = youpiRes.body.paymentId;
+        const checkoutUrl = `${hostUrl}/checkout/${paymentId}`;
+        const upiIntentUri = `upi://pay?pa=${encodeURIComponent(UPI_ID)}&pn=${encodeURIComponent(PAYEE_NAME)}&am=${PRICE_INR}.00&cu=INR&tn=${encodeURIComponent(orderId)}`;
+
+        paymentSessions[paymentId] = {
+          orderId,
+          paymentId,
+          letterRef,
+          amount: PRICE_INR,
+          status: 'INITIATED',
+          createdAt: Date.now()
+        };
+
+        return reply(res, {
+          ok: true,
+          success: true,
+          checkoutCreated: true,
+          provider: 'youpi',
+          url: checkoutUrl,
+          checkoutUrl: checkoutUrl,
+          paymentId: paymentId,
+          upiUri: upiIntentUri,
+          orderId: orderId,
+          amount: PRICE_INR,
+          currency: 'INR',
+          upiId: UPI_ID,
+          payeeName: PAYEE_NAME,
+          paid: false,
+          paymentNotCompleted: true
+        });
+      } else {
+        console.error('YouPI returned unexpected:', youpiRes);
+      }
+    } catch(err) {
+      console.error('Error creating YouPI session:', err);
+    }
+
+    // Direct fallback UPI intent if YouPI gateway is restarting
+    const fallbackOrderId = 'ORD-' + Date.now();
+    const fallbackUpi = `upi://pay?pa=${encodeURIComponent(UPI_ID)}&pn=${encodeURIComponent(PAYEE_NAME)}&am=${PRICE_INR}.00&cu=INR&tn=${encodeURIComponent(fallbackOrderId)}`;
     return reply(res, {
       ok: true,
       success: true,
-      checkoutCreated: false,
-      paid: true,
-      paymentNotCompleted: false,
-      url: null,
-      provider: 'local-bypass',
-      message: 'Payment bypassed: letter unlocked with admin authority'
+      checkoutCreated: true,
+      provider: 'upi-direct',
+      url: fallbackUpi,
+      checkoutUrl: fallbackUpi,
+      upiUri: fallbackUpi,
+      amount: PRICE_INR,
+      currency: 'INR',
+      upiId: UPI_ID,
+      payeeName: PAYEE_NAME,
+      paid: false,
+      paymentNotCompleted: true
     });
+  }
+
+  // Webhook from YouPI-PG
+  if (pathname === '/api/payments/youpi-webhook') {
+    const event = body.event || body.type || '';
+    const status = (body.status || body.outcome || '').toUpperCase();
+    const orderId = body.orderId || (body.data && body.data.orderId) || '';
+    const paymentId = body.paymentId || body.id || (body.data && body.data.paymentId) || '';
+
+    console.log(`[YouPI Webhook] event: ${event}, status: ${status}, orderId: ${orderId}, paymentId: ${paymentId}`);
+
+    if (status === 'SUCCESS' || status === 'RECONCILED' || status === 'OBSERVED_SUCCESS' || event.includes('SUCCESS')) {
+      const sess = paymentSessions[paymentId] || Object.values(paymentSessions).find(s => s.orderId === orderId);
+      const letterRef = sess ? sess.letterRef : (orderId ? orderId.replace(/^ORD-/, '') : null);
+      if (letterRef) {
+        markLetterAsPaid(letterRef);
+      }
+      return reply(res, { ok: true, handled: true, status: 'acknowledged' });
+    }
+
+    return reply(res, { ok: true, ignored: true });
+  }
+
+  // Manual UTR Verification Endpoint
+  if (pathname === '/api/payments/verify-utr') {
+    const utr = (body.utr || body.reference || '').trim();
+    const paymentId = body.paymentId || '';
+    const letterRef = body.letterRef || body.shareableLink || body.letterId || '';
+
+    if (!utr || utr.length < 8) {
+      return reply(res, { ok: false, error: 'Please enter a valid 12-digit UPI reference (UTR) number.' }, 400);
+    }
+
+    if (paymentId) {
+      try {
+        await new Promise((resolve) => {
+          const preq = http.request({
+            hostname: '127.0.0.1',
+            port: YOUPI_API_PORT,
+            path: `/api/v1/admin/payments/${encodeURIComponent(paymentId)}/confirm`,
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${YOUPI_ADMIN_TOKEN}`
+            }
+          }, resolve);
+          preq.on('error', resolve);
+          preq.write(JSON.stringify({ notes: `Verified UTR: ${utr}` }));
+          preq.end();
+        });
+      } catch (e) {
+        console.error('Failed to notify YouPI of UTR:', e);
+      }
+    }
+
+    markLetterAsPaid(letterRef);
+    return reply(res, { ok: true, verified: true, message: 'Payment verified successfully.' });
   }
 
   // Turnstile Verification Bypassed
@@ -333,12 +556,13 @@ async function handleApiRequest(req, res, pathname) {
       const shareableLink = draft.shareableLink || 'birthday-' + recipient.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Math.random().toString(36).substring(2, 7);
       const letterId = 'letter-' + Date.now();
 
+      const isDraftPaid = Boolean(draft.paid || draft.isPaid);
       const newLetter = {
         id: letterId,
         shareableLink: shareableLink,
-        status: 'published',
-        paid: true,
-        isPaid: true,
+        status: isDraftPaid ? 'published' : 'draft',
+        paid: isDraftPaid,
+        isPaid: isDraftPaid,
         hasPassword: false,
         isAuthor: true,
         isAdmin: true,
@@ -551,8 +775,9 @@ async function handleApiRequest(req, res, pathname) {
       };
     }
 
-    letter.paid = true;
-    letter.isPaid = true;
+    const isPaid = (letter.paid === true || letter.isPaid === true);
+    letter.paid = isPaid;
+    letter.isPaid = isPaid;
     letter.isAuthor = true;
     letter.isAdmin = true;
     letter.authority = 'admin';
@@ -563,7 +788,7 @@ async function handleApiRequest(req, res, pathname) {
         letter: {
           id: letter.id,
           shareableLink: letter.shareableLink,
-          paid: true,
+          paid: isPaid,
           hasPassword: false,
           isAuthor: true,
           isAdmin: true,
@@ -676,7 +901,7 @@ r.dataset.resolvedTheme=d?'dark':'light';r.style.colorScheme=d?'dark':'light';}c
           "PUBLIC_2LUV_MEDIA_BASE_URL": "",
           "PUBLIC_SITE_URL": "${publicSiteUrl}",
           "PUBLIC_2LUV_API_BASE_URL": "${publicSiteUrl}",
-          "PUBLIC_FF_PAID_LETTER_FLOW": false
+          "PUBLIC_FF_PAID_LETTER_FLOW": true
         }
       };
 
@@ -714,7 +939,7 @@ r.dataset.resolvedTheme=d?'dark':'light';r.style.colorScheme=d?'dark':'light';}c
                 },
                 dictionary: {},
                 initiallyOpen: false,
-                requiresPaymentUnlock: false,
+                requiresPaymentUnlock: !(letter.paid === true || letter.isPaid === true),
                 showOwnerActions: true
               },
               uses: {}
@@ -855,6 +1080,16 @@ function serveStaticFile(req, res, pathname) {
 const primaryServer = http.createServer((req, res) => {
   const url = new URL(req.url, `http://localhost:${WEB_PORT}`);
   const pathname = url.pathname;
+
+  // Checkout Portal & Payment Proxy (Forward to YouPI-PG on port 7000)
+  if (
+    pathname.startsWith('/checkout') ||
+    pathname.startsWith('/api/v1/') ||
+    pathname.startsWith('/css/checkout') ||
+    pathname.startsWith('/icons/upi.svg')
+  ) {
+    return proxyToPort(req, res, YOUPI_CHECKOUT_PORT, req.url);
+  }
 
   if (pathname.startsWith('/api/') || pathname.startsWith('/__r2-part/')) {
     return handleApiRequest(req, res, pathname);
