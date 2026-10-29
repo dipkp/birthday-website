@@ -1898,6 +1898,24 @@ function serveStaticFile(req, res, pathname) {
           filePath = rootIndex;
         }
       } else {
+        // Universal asset fallbacks: match any /assets/ or /fonts/ request regardless of preceding route prefix
+        const assetIdx = decoded.indexOf('/assets/');
+        if (assetIdx !== -1) {
+          const sub = decoded.slice(assetIdx + 8);
+          const assetCandidate = path.join(REPLICA_DIR, 'assets', sub.replace(/\//g, path.sep));
+          if (fs.existsSync(assetCandidate) && !fs.statSync(assetCandidate).isDirectory()) {
+            filePath = assetCandidate;
+          }
+        }
+        const fontIdx = decoded.indexOf('/fonts/');
+        if (fontIdx !== -1 && (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory())) {
+          const sub = decoded.slice(fontIdx + 7);
+          const fontCandidate = path.join(REPLICA_DIR, 'fonts', sub.replace(/\//g, path.sep));
+          if (fs.existsSync(fontCandidate) && !fs.statSync(fontCandidate).isDirectory()) {
+            filePath = fontCandidate;
+          }
+        }
+
         // Asset fallbacks: strip locale prefix if present
         const clean = decoded.replace(/^\/[a-z]{2}(?:-[a-z]{2})?\//, '/');
         const altFile = path.join(REPLICA_DIR, clean.replace(/^\//, '').replace(/\//g, path.sep));
