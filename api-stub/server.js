@@ -1873,23 +1873,41 @@ function serveStaticFile(req, res, pathname) {
 
   // If path is a directory, try index.html
   if (fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()) {
+    if (!pathname.endsWith('/')) {
+      const search = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
+      res.writeHead(301, { 'Location': `${pathname}/${search}` });
+      return res.end();
+    }
     const candidate = path.join(filePath, 'index.html');
     if (fs.existsSync(candidate)) filePath = candidate;
   } else if (!fs.existsSync(filePath)) {
     // Try adding index.html
     const candidate = path.join(filePath, 'index.html');
     if (fs.existsSync(candidate)) {
+      if (!pathname.endsWith('/')) {
+        const search = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
+        res.writeHead(301, { 'Location': `${pathname}/${search}` });
+        return res.end();
+      }
       filePath = candidate;
     } else {
-      // Asset fallbacks: strip locale prefix if present
-      const clean = decoded.replace(/^\/[a-z]{2}(?:-[a-z]{2})?\//, '/');
-      const altFile = path.join(REPLICA_DIR, clean.replace(/^\//, '').replace(/\//g, path.sep));
-      if (fs.existsSync(altFile) && !fs.statSync(altFile).isDirectory()) {
-        filePath = altFile;
+      // Special alias: /en/event/birthday fallback to replica index.html
+      if (pathname === '/en/event/birthday' || pathname === '/en/event/birthday/') {
+        const rootIndex = path.join(REPLICA_DIR, 'index.html');
+        if (fs.existsSync(rootIndex)) {
+          filePath = rootIndex;
+        }
       } else {
-        const altAssets = path.join(REPLICA_DIR, 'assets', clean.replace(/^\//, '').replace(/\//g, path.sep));
-        if (fs.existsSync(altAssets) && !fs.statSync(altAssets).isDirectory()) {
-          filePath = altAssets;
+        // Asset fallbacks: strip locale prefix if present
+        const clean = decoded.replace(/^\/[a-z]{2}(?:-[a-z]{2})?\//, '/');
+        const altFile = path.join(REPLICA_DIR, clean.replace(/^\//, '').replace(/\//g, path.sep));
+        if (fs.existsSync(altFile) && !fs.statSync(altFile).isDirectory()) {
+          filePath = altFile;
+        } else {
+          const altAssets = path.join(REPLICA_DIR, 'assets', clean.replace(/^\//, '').replace(/\//g, path.sep));
+          if (fs.existsSync(altAssets) && !fs.statSync(altAssets).isDirectory()) {
+            filePath = altAssets;
+          }
         }
       }
     }
@@ -1939,6 +1957,26 @@ function serveStaticFile(req, res, pathname) {
 const primaryServer = http.createServer((req, res) => {
   const url = new URL(req.url, `http://localhost:${WEB_PORT}`);
   const pathname = url.pathname;
+
+  // English Birthday Landing Page
+  if (pathname === '/en/event/birthday') {
+    const search = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
+    res.writeHead(301, { 'Location': `/en/event/birthday/${search}` });
+    return res.end();
+  }
+  if (pathname === '/en/event/birthday/') {
+    const enBirthdayPath = path.join(REPLICA_DIR, 'en', 'event', 'birthday', 'index.html');
+    if (fs.existsSync(enBirthdayPath)) {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      fs.createReadStream(enBirthdayPath).pipe(res);
+      return;
+    } else {
+      const rootIndex = path.join(REPLICA_DIR, 'index.html');
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      fs.createReadStream(rootIndex).pipe(res);
+      return;
+    }
+  }
 
   // Supervisor & Admin Dashboard
   if (pathname === '/admin' || pathname === '/admin/' || pathname === '/admin/index.html') {
