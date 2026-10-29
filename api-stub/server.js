@@ -1983,15 +1983,30 @@ const primaryServer = http.createServer((req, res) => {
     return res.end();
   }
 
-  // Canonical Clean URLs: Never expose /index.html in the URL bar
+  // Utility Route Aliases (terms, privacy, cookies, copyright, dmca, my-gifts)
+  const utilityAliases = ['my-gifts', 'terms', 'privacy', 'cookies', 'copyright', 'dmca'];
+  for (const alias of utilityAliases) {
+    if (pathname === `/${alias}` || pathname === `/${alias}/`) {
+      res.writeHead(301, { 'Location': `/en/${alias}/${search}` });
+      return res.end();
+    }
+  }
+
+  // Canonical Clean URLs: Universally strip .html and /index.html
   if (pathname === '/index.html') {
     res.writeHead(301, { 'Location': `/${search}` });
     return res.end();
   }
-  if (pathname.endsWith('/index.html') && pathname !== '/admin/index.html') {
-    const cleanDir = pathname.slice(0, -10) || '/';
-    res.writeHead(301, { 'Location': `${cleanDir}/${search}`.replace(/\/+/g, '/') });
-    return res.end();
+  if (pathname.endsWith('.html') && pathname !== '/admin/index.html') {
+    if (pathname.endsWith('/index.html')) {
+      const cleanDir = pathname.slice(0, -10) || '/';
+      res.writeHead(301, { 'Location': `${cleanDir}/${search}`.replace(/\/+/g, '/') });
+      return res.end();
+    } else {
+      const cleanPath = pathname.slice(0, -5);
+      res.writeHead(301, { 'Location': `${cleanPath}/${search}` });
+      return res.end();
+    }
   }
 
   // English Birthday Landing Page
