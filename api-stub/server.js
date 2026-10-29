@@ -556,6 +556,66 @@ async function handleApiRequest(req, res, pathname) {
       const shareableLink = draft.shareableLink || 'birthday-' + recipient.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Math.random().toString(36).substring(2, 7);
       const letterId = 'letter-' + Date.now();
 
+      const proto = req.headers['x-forwarded-proto'] || 'https';
+      const host = req.headers.host || 'luve.duckdns.org';
+      const hostUrl = `${proto}://${host}`;
+      const returnUrl = `${hostUrl}/en/letter/${encodeURIComponent(shareableLink)}?payment=success`;
+      const orderId = 'ORD-' + Date.now();
+
+      let paymentId = '';
+      let checkoutUrl = '';
+
+      try {
+        const youpiRes = await new Promise((resolve, reject) => {
+          const pLoad = JSON.stringify({
+            orderId: orderId,
+            amount: PRICE_INR,
+            currency: 'INR',
+            returnUrl: returnUrl
+          });
+          const preq = http.request({
+            hostname: '127.0.0.1',
+            port: YOUPI_API_PORT,
+            path: '/api/v1/payments',
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Merchant-Id': MERCHANT_ID,
+              'Content-Length': Buffer.byteLength(pLoad)
+            }
+          }, (pres) => {
+            let data = '';
+            pres.on('data', chunk => data += chunk);
+            pres.on('end', () => {
+              try { resolve({ status: pres.statusCode, body: JSON.parse(data) }); }
+              catch(e) { resolve({ status: pres.statusCode, body: data }); }
+            });
+          });
+          preq.on('error', reject);
+          preq.write(pLoad);
+          preq.end();
+        });
+
+        if (youpiRes.status === 201 && youpiRes.body?.paymentId) {
+          paymentId = youpiRes.body.paymentId;
+          checkoutUrl = `${hostUrl}/checkout/${paymentId}`;
+          paymentSessions[paymentId] = {
+            orderId,
+            paymentId,
+            letterRef: shareableLink,
+            amount: PRICE_INR,
+            status: 'INITIATED',
+            createdAt: Date.now()
+          };
+        }
+      } catch (e) {
+        console.error('Failed to create checkout session in finalize:', e);
+      }
+
+      if (!checkoutUrl && paymentId) {
+        checkoutUrl = `${hostUrl}/checkout/${paymentId}`;
+      }
+
       const isDraftPaid = Boolean(draft.paid || draft.isPaid);
       const newLetter = {
         id: letterId,
@@ -563,6 +623,8 @@ async function handleApiRequest(req, res, pathname) {
         status: isDraftPaid ? 'published' : 'draft',
         paid: isDraftPaid,
         isPaid: isDraftPaid,
+        paymentId: paymentId,
+        checkoutUrl: checkoutUrl,
         hasPassword: false,
         isAuthor: true,
         isAdmin: true,
@@ -595,7 +657,9 @@ async function handleApiRequest(req, res, pathname) {
           shareableLink: shareableLink,
           letterId: letterId,
           id: letterId,
-          paid: true,
+          paid: isDraftPaid,
+          checkoutUrl: checkoutUrl,
+          paymentId: paymentId,
           theme: newLetter.theme,
           recipientName: newLetter.recipientName,
           senderName: newLetter.authorName
@@ -862,9 +926,112 @@ async function handleApiRequest(req, res, pathname) {
 }
 
 function renderLetterShell(locale, link, letter, hostUrl = '') {
+  const isPaid = Boolean(letter.paid === true || letter.isPaid === true);
   const recipient = letter.recipientName || 'My Love';
   const canonicalUrl = hostUrl ? (hostUrl + '/' + locale + '/letter/' + link) : ('/' + locale + '/letter/' + link);
   const publicSiteUrl = hostUrl || '';
+  const orderId = letter.orderId || ('ORD-' + link);
+  const paymentId = letter.paymentId || '';
+  const checkoutUrl = letter.checkoutUrl || (paymentId ? `${hostUrl}/checkout/${paymentId}` : `/checkout/`);
+  const upiIntentUri = `upi://pay?pa=${encodeURIComponent(UPI_ID)}&pn=${encodeURIComponent(PAYEE_NAME)}&am=${PRICE_INR}.00&cu=INR&tn=${encodeURIComponent(orderId)}`;
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiIntentUri)}`;
+
+  const unpaidOverlayHtml = isPaid ? '' : `
+<div id="luvePayGate" style="position:fixed;inset:0;background:rgba(15,10,25,0.88);backdrop-filter:blur(8px);z-index:999999;display:flex;align-items:center;justify-content:center;padding:16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,sans-serif;">
+  <div style="background:#ffffff;color:#1e1e2f;border-radius:24px;max-width:440px;width:100%;box-shadow:0 25px 60px rgba(0,0,0,0.45);overflow:hidden;text-align:center;animation:luvePop 0.3s ease-out;">
+    <div style="background:linear-gradient(135deg,#e11d48,#be123c);padding:24px 20px;color:#fff;">
+      <div style="font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:0.9;">Luve gifts · Birthday Website</div>
+      <h2 style="margin:8px 0 4px;font-size:22px;font-weight:800;letter-spacing:-0.5px;">Unlock Gift for ${recipient}</h2>
+      <p style="margin:0;font-size:14px;opacity:0.95;">One-time payment of ₹${PRICE_INR} for permanent lifetime access</p>
+    </div>
+    <div style="padding:22px 20px;">
+      <div style="background:#f8fafc;border:2px dashed #cbd5e1;border-radius:18px;padding:16px;display:inline-block;margin-bottom:14px;">
+        <img src="${qrUrl}" alt="Scan UPI QR" style="width:190px;height:190px;display:block;border-radius:8px;margin:0 auto;" />
+        <div style="margin-top:10px;font-size:13px;font-weight:700;color:#0f172a;">Scan with Any UPI App</div>
+        <div style="font-size:12px;color:#64748b;">GPay · PhonePe · Paytm · BHIM</div>
+      </div>
+      <div style="margin-bottom:14px;font-size:13px;color:#475569;">
+        Payee: <strong>${PAYEE_NAME}</strong> (<code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;color:#0f172a;font-weight:600;">${UPI_ID}</code>)
+      </div>
+      <div style="display:flex;gap:10px;margin-bottom:16px;">
+        <a href="${upiIntentUri}" style="flex:1;background:#2563eb;color:#fff;text-decoration:none;font-weight:700;font-size:13px;padding:12px 8px;border-radius:12px;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 4px 12px rgba(37,99,235,0.3);">
+          ⚡ Pay via UPI App
+        </a>
+        <a href="${checkoutUrl}" style="flex:1;background:#0f172a;color:#fff;text-decoration:none;font-weight:700;font-size:13px;padding:12px 8px;border-radius:12px;display:flex;align-items:center;justify-content:center;">
+          Open Gateway
+        </a>
+      </div>
+      <div style="border-top:1px solid #e2e8f0;padding-top:14px;text-align:left;">
+        <label style="font-size:12px;font-weight:700;color:#475569;display:block;margin-bottom:6px;">Already paid? Enter 12-digit UPI Reference (UTR) number:</label>
+        <div style="display:flex;gap:8px;">
+          <input id="luveUtrInput" type="text" placeholder="e.g. 429381729182" maxlength="16" style="flex:1;padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:13px;outline:none;" />
+          <button id="luveVerifyBtn" onclick="verifyLuvePayment()" style="background:#16a34a;color:#fff;border:none;padding:10px 16px;border-radius:10px;font-weight:700;cursor:pointer;font-size:13px;">Verify</button>
+        </div>
+        <div id="luveVerifyStatus" style="font-size:12px;margin-top:6px;color:#dc2626;display:none;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+async function verifyLuvePayment() {
+  const btn = document.getElementById('luveVerifyBtn');
+  const input = document.getElementById('luveUtrInput');
+  const status = document.getElementById('luveVerifyStatus');
+  const utr = (input.value || '').trim();
+  if (utr.length < 8) {
+    status.style.display = 'block';
+    status.style.color = '#dc2626';
+    status.textContent = 'Please enter a valid 12-digit UPI reference (UTR) number.';
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = 'Verifying...';
+  status.style.display = 'block';
+  status.style.color = '#2563eb';
+  status.textContent = 'Verifying payment with banking server...';
+  try {
+    const res = await fetch('/api/payments/verify-utr', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ utr: utr, letterRef: '${link}', paymentId: '${paymentId}' })
+    });
+    const d = await res.json();
+    if (d.ok || d.verified) {
+      status.style.color = '#16a34a';
+      status.textContent = '🎉 Payment confirmed! Unlocking gift...';
+      setTimeout(() => {
+        window.location.href = window.location.pathname + '?payment=success';
+      }, 1000);
+    } else {
+      btn.disabled = false;
+      btn.textContent = 'Verify';
+      status.style.color = '#dc2626';
+      status.textContent = d.error || 'Verification failed. Please check the UTR.';
+    }
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = 'Verify';
+    status.style.color = '#dc2626';
+    status.textContent = 'Network error. Please try again.';
+  }
+}
+</script>`;
+
+  const paidCelebrationHtml = isPaid ? `
+<div id="luveShareBar" style="position:fixed;top:0;left:0;right:0;background:linear-gradient(90deg,#059669,#10b981);color:#fff;z-index:99999;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 4px 15px rgba(0,0,0,0.2);font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px;font-weight:600;">
+  <div>
+    🎉 <strong>Gift Unlocked &amp; Live!</strong> Share this private lifetime link with ${recipient}:
+  </div>
+  <div style="display:flex;gap:8px;">
+    <button onclick="navigator.clipboard.writeText('${canonicalUrl}');alert('Private gift link copied to clipboard!');" style="background:#fff;color:#065f46;border:none;padding:6px 14px;border-radius:20px;font-weight:700;font-size:12px;cursor:pointer;">
+      📋 Copy Link
+    </button>
+    <a href="https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(canonicalUrl)}" target="_blank" style="background:#065f46;color:#fff;text-decoration:none;padding:6px 14px;border-radius:20px;font-weight:700;font-size:12px;">
+      📲 Download QR
+    </a>
+  </div>
+</div>` : '';
+
   return `<!doctype html>
 <html lang="${locale}-US" dir="ltr">
 <head>
@@ -884,6 +1051,9 @@ function renderLetterShell(locale, link, letter, hostUrl = '') {
 <link rel="stylesheet" href="/_app/immutable/assets/PartyStoryBook.SbYBhSRQ.css">
 <link rel="stylesheet" href="/_app/immutable/assets/PartyPlacesStage.BUAgiJ4m.css">
 <link rel="stylesheet" href="/_app/immutable/assets/PartyMusicStage.Dl_OQd4c.css">
+<style>
+@keyframes luvePop { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
+</style>
 <script>
 (function(){try{var s=localStorage.getItem('theme');var t=(s==='light'||s==='dark'||s==='system')?s:'system';
 var d=t==='dark'||(t==='system'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);
@@ -892,6 +1062,7 @@ r.dataset.resolvedTheme=d?'dark':'light';r.style.colorScheme=d?'dark':'light';}c
 </script>
 </head>
 <body data-sveltekit-preload-data="hover">
+${paidCelebrationHtml}
 <div style="display: contents">
   <script>
     {
@@ -950,6 +1121,7 @@ r.dataset.resolvedTheme=d?'dark':'light';r.style.colorScheme=d?'dark':'light';}c
     }
   </script>
 </div>
+${unpaidOverlayHtml}
 </body>
 </html>`;
 }
@@ -975,14 +1147,24 @@ function serveStaticFile(req, res, pathname) {
   if (letterMatch) {
     const locale = letterMatch[1] || 'en';
     const link = letterMatch[2];
+    const urlObj = new URL(req.url, 'http://localhost');
+    const paymentSuccess = urlObj.searchParams.get('payment') === 'success';
+
     let letter = letters[link] || Object.values(letters).find(l => l.shareableLink === link || l.id === link);
+    if (letter && paymentSuccess) {
+      letter.paid = true;
+      letter.isPaid = true;
+      letter.status = 'published';
+      saveLetters();
+    }
+
     if (!letter) {
       letter = {
         id: 'letter-' + link,
         shareableLink: link,
-        status: 'published',
-        paid: true,
-        isPaid: true,
+        status: paymentSuccess ? 'published' : 'draft',
+        paid: paymentSuccess,
+        isPaid: paymentSuccess,
         hasPassword: false,
         isAuthor: true,
         isAdmin: true,
