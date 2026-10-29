@@ -101,6 +101,63 @@ function markLetterAsPaid(letterRef) {
   return false;
 }
 
+async function getOrCreatePaymentSession(letterRef, hostUrl) {
+  const existing = Object.values(paymentSessions).find(s => s.status === 'INITIATED' && (Date.now() - s.createdAt < 3600000));
+  if (existing) {
+    return existing;
+  }
+  const orderId = 'ORD-' + Date.now();
+  const returnUrl = `${hostUrl}/en/letter/${encodeURIComponent(letterRef || 'birthday-gift')}?payment=success`;
+  try {
+    const youpiRes = await new Promise((resolve, reject) => {
+      const payload = JSON.stringify({
+        orderId: orderId,
+        amount: PRICE_INR,
+        currency: 'INR',
+        returnUrl: returnUrl
+      });
+      const preq = http.request({
+        hostname: '127.0.0.1',
+        port: YOUPI_API_PORT,
+        path: '/api/v1/payments',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Merchant-Id': MERCHANT_ID,
+          'Content-Length': Buffer.byteLength(payload)
+        }
+      }, (pres) => {
+        let data = '';
+        pres.on('data', chunk => data += chunk);
+        pres.on('end', () => {
+          try { resolve({ status: pres.statusCode, body: JSON.parse(data) }); }
+          catch(e) { resolve({ status: pres.statusCode, body: data }); }
+        });
+      });
+      preq.on('error', reject);
+      preq.write(payload);
+      preq.end();
+    });
+    if (youpiRes.status === 201 && youpiRes.body?.paymentId) {
+      const paymentId = youpiRes.body.paymentId;
+      const sess = {
+        orderId,
+        paymentId,
+        letterRef: letterRef || 'birthday-gift',
+        amount: PRICE_INR,
+        status: 'INITIATED',
+        createdAt: Date.now()
+      };
+      paymentSessions[paymentId] = sess;
+      return sess;
+    }
+  } catch(err) {
+    console.error('getOrCreatePaymentSession error:', err);
+  }
+  return null;
+}
+
+
 function proxyToPort(req, res, targetPort, pathnameWithSearch) {
   const options = {
     hostname: '127.0.0.1',
@@ -1263,12 +1320,43 @@ const primaryServer = http.createServer((req, res) => {
   const url = new URL(req.url, `http://localhost:${WEB_PORT}`);
   const pathname = url.pathname;
 
+  // Root Checkout / Pay redirects
+  if (
+    pathname === '/checkout' ||
+    pathname === '/checkout/' ||
+    pathname === '/pay' ||
+    pathname === '/pay/' ||
+    pathname === '/payment' ||
+    pathname === '/payment/' ||
+    pathname === '/gateway' ||
+    pathname === '/gateway/'
+  ) {
+    const proto = req.headers['x-forwarded-proto'] || 'https';
+    const host = req.headers.host || 'luve.duckdns.org';
+    const hostUrl = `${proto}://${host}`;
+    getOrCreatePaymentSession('gift', hostUrl).then((sess) => {
+      if (sess && sess.paymentId) {
+        res.writeHead(302, { 'Location': `/checkout/${sess.paymentId}` });
+        res.end();
+      } else {
+        res.writeHead(302, { 'Location': '/en/create/birthday-party/' });
+        res.end();
+      }
+    }).catch(() => {
+      res.writeHead(302, { 'Location': '/en/create/birthday-party/' });
+      res.end();
+    });
+    return;
+  }
+
   // Checkout Portal & Payment Proxy (Forward to YouPI-PG on port 7000)
   if (
-    pathname.startsWith('/checkout') ||
+    pathname.startsWith('/checkout/') ||
     pathname.startsWith('/api/v1/') ||
     pathname.startsWith('/css/checkout') ||
-    pathname.startsWith('/icons/')
+    pathname.startsWith('/icons/') ||
+    pathname === '/youpi.js' ||
+    pathname.startsWith('/sdk/')
   ) {
     return proxyToPort(req, res, YOUPI_CHECKOUT_PORT, req.url);
   }
