@@ -1,0 +1,1 @@
+import{t as i,i as s}from"./jOkX8_0v.js";function c(o,e,n,t){const r=i(o,e,n);return t?s(r,t):r}function p(o,e){const n=e.split(".").filter(Boolean);let t=o;for(const r of n){if(!t||typeof t!="object"||!(r in t))return{};t=t[r]}return t&&typeof t=="object"?t:{}}function u(o,e){return typeof o=="string"&&o.trim()?o:e}export{u as a,p as s,c as t};

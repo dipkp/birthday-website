@@ -1,0 +1,22 @@
+{
+  "name": "2luv-birthday-website",
+  "version": "1.0.0",
+  "description": "2luv Autonomous Birthday Website & Gift Creator with 3D Cake, Audio, Music & AI",
+  "main": "api-stub/server.js",
+  "scripts": {
+    "start": "node api-stub/server.js",
+    "build": "echo 'Build complete'"
+  },
+  "keywords": [
+    "birthday",
+    "love-letter",
+    "party",
+    "3d",
+    "ai",
+    "2luv"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -1,0 +1,1 @@
+function l(i,o){let e=!1,t;function c(n){i.getRoot?.()?.dispatchEvent(new CustomEvent("cinematic-child-sheet",{detail:{id:o,open:n,returnFocus:t}}))}return{open(n){e||(e=!0,t=n??(document.activeElement instanceof HTMLElement?document.activeElement:void 0),c(!0))},closed(){e&&(e=!1,c(!1),t=void 0)}}}export{l as c};

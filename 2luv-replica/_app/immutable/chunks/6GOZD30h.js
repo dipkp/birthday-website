@@ -1,0 +1,1 @@
+const o=262144,r=300;function s(e){return new TextEncoder().encode(JSON.stringify(e)).byteLength}function c(e){return n(e)!==null}function n(e){const t=JSON.stringify(e);if(t===void 0)throw new TypeError("Cards requests must be JSON serializable.");return new TextEncoder().encode(t).byteLength<=262144?t:null}export{r as C,o as a,s as b,n as c,c as d};

@@ -1,0 +1,1 @@
+const i={width:1672,height:941};function c(a){const o=Math.max(1,a.width),h=Math.max(1,a.height),t=o/h;return{format:t>=1.3?"landscape":t>=.85?"square":"portrait",compact:h<560,aspectRatio:t}}export{i as R,c as l};

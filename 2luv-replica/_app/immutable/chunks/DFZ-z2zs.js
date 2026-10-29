@@ -1,0 +1,1 @@
+function r(e,t=!1){return(typeof e=="string"||typeof e=="number"?String(e).trim():"")!=="0"}function o(e){return(typeof e=="string"||typeof e=="number"?String(e).trim():"")==="1"}function u({flag:e,recoveryV2:t,snapshot:n}){return e!==!0?!1:t?n?.photoScenesEnabled===!0:!0}export{o as a,u as p,r};

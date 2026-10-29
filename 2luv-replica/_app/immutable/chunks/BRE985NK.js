@@ -1,0 +1,1 @@
+import{l as c}from"./CUH1Esmj.js";import{b as o}from"./CNpMX7jb.js";import{p as t}from"./8sQyvXPq.js";import{p as a,a as l}from"./CjcdnMkT.js";function p(i,r){return(e,n={})=>o(t(e),{params:n,region:r})}function h(i,r){a(l(c(i.theme),i.id||i.shareableLink,p(r,null)))}export{p as clientPurchasePricingRequest,h as prefetchGiftUnlockPricing};

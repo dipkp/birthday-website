@@ -1,0 +1,1 @@
+class s extends Error{constructor(o,r,t,e){super(o),this.code=o,this.photoIndex=r,this.fileName=t,this.originalError=e,this.name="UploadPhotoError"}code;photoIndex;fileName;originalError}export{s as U};

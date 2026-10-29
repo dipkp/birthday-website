@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI gift suggestions — 2luv replica</title>
+<meta name="robots" content="noindex,nofollow">
+<!--
+  AI feature wired to the local FreeLLMAPI gateway through ai-service/.
+  The API key never reaches this page: the browser gets a per-session AES-256-GCM
+  key, the service returns ciphertext, and decryption happens here with WebCrypto.
+-->
+<style>
+/* local fonts — no Google Fonts request */
+@font-face{font-family:Inter;font-style:normal;font-weight:400 700;font-display:swap;src:url(/fonts/inter-latin.woff2) format("woff2")}
+@font-face{font-family:Lora;font-style:normal;font-weight:400 700;font-display:swap;src:url(/fonts/lora-latin.woff2) format("woff2")}
+@font-face{font-family:'Cormorant Garamond';font-style:normal;font-weight:400 700;font-display:swap;src:url(/fonts/cormorant-garamond-roman-latin.woff2) format("woff2")}
+@font-face{font-family:'Great Vibes';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/great-vibes-roman-latin.woff2) format("woff2")}
+@font-face{font-family:'Abril Fatface';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/abril-fatface-latin.woff2) format("woff2")}
+@font-face{font-family:'Shadows Into Light';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/shadows-into-light-latin.woff2) format("woff2")}
+@font-face{font-family:Zeyada;font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/zeyada-latin.woff2) format("woff2")}
+
+:root{
+  --bg:#f4ece0; --paper:#fbf6ec; --ink:#2b1d16; --muted:#6c574c; --line:rgba(51,35,28,.14);
+  --wine:#8e2433; --rose:#c9606f; --gold:#d9b47c;
+  --display:'Cormorant Garamond',Georgia,serif; --body:Inter,system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);
+  background-image:radial-gradient(circle at 12% 0%,rgba(201,96,111,.14),transparent 30rem),
+                   radial-gradient(circle at 88% 6%,rgba(217,180,124,.18),transparent 26rem)}
+.wrap{width:min(940px,calc(100% - 2*clamp(18px,5vw,56px)));margin-inline:auto;padding:34px 0 70px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:13px;color:var(--muted)}
+.top a{color:inherit;text-decoration:none;border-bottom:1px solid var(--line);padding-bottom:1px}
+.eyebrow{display:inline-flex;align-items:center;gap:10px;margin-top:34px;
+  font:600 11.5px/1.4 var(--body);letter-spacing:.22em;text-transform:uppercase;color:var(--wine)}
+.eyebrow::before{content:"";width:26px;height:1px;background:currentColor;opacity:.6}
+h1{font-family:var(--display);font-weight:500;font-size:clamp(2.2rem,5vw,3.6rem);line-height:1.02;
+  margin:14px 0 0;letter-spacing:-.012em}
+h1 em{font-style:italic;color:var(--wine)}
+.lede{max-width:620px;margin:14px 0 0;color:var(--muted);line-height:1.65}
+.panel{margin-top:30px;background:var(--paper);border:1px solid var(--line);border-radius:20px;padding:clamp(18px,3vw,28px)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:640px){.grid{grid-template-columns:1fr}}
+label{display:block;font:600 11.5px/1.4 var(--body);letter-spacing:.14em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:7px}
+input,select{width:100%;min-height:46px;border:1px solid var(--line);border-radius:12px;padding:0 14px;
+  background:#fff;color:var(--ink);font:inherit}
+input:focus-visible,select:focus-visible{outline:2px solid var(--rose);outline-offset:2px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:48px;
+  padding:13px 26px;border:0;border-radius:999px;background:var(--wine);color:#fff8f2;
+  font:600 15px/1.2 var(--body);cursor:pointer;margin-top:16px;
+  box-shadow:0 14px 30px -18px rgba(142,36,51,.7);transition:transform .2s,box-shadow .2s}
+.btn:hover{transform:translateY(-1px)}
+.btn:disabled{opacity:.55;cursor:progress;transform:none}
+.status{margin-top:14px;font-size:13.5px;color:var(--muted);min-height:20px}
+.status.err{color:#a4232f}
+.cards{margin-top:26px;display:grid;gap:14px}
+.card{border:1px solid var(--line);border-radius:18px;background:var(--paper);padding:18px 20px;
+  animation:rise .5s cubic-bezier(.22,.68,.31,1) both}
+.card:nth-child(2){animation-delay:.07s}
+.card:nth-child(3){animation-delay:.14s}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.card h3{margin:0 0 6px;font-family:var(--display);font-size:1.32rem;font-weight:600}
+.card p{margin:0;color:var(--muted);line-height:1.6}
+.tone{display:inline-block;margin-top:10px;font:600 10.5px/1.6 var(--body);letter-spacing:.16em;
+  text-transform:uppercase;color:var(--wine);border:1px solid var(--line);border-radius:999px;padding:2px 10px}
+.meta{margin-top:18px;font-size:12px;color:var(--muted);line-height:1.7}
+.meta code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;
+  background:rgba(51,35,28,.06);border-radius:5px;padding:1px 5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="top">
+    <a href="../index.html">&larr; Birthday page</a>
+    <span>AI suggestions · local gateway</span>
+  </div>
+
+  <p class="eyebrow">AI Feature</p>
+  <h1>Stuck on the words? <em>Ask the letter model.</em></h1>
+  <p class="lede">Three opening lines for a birthday letter, generated on your machine through the
+    FreeLLMAPI gateway. The request is encrypted: this page holds only a short-lived session key,
+    and the API key itself never leaves the local service.</p>
+
+  <div class="panel">
+    <div class="grid">
+      <div>
+        <label for="topic">Occasion or topic</label>
+        <input id="topic" value="birthday letter for my best friend" autocomplete="off">
+      </div>
+      <div>
+        <label for="rel">Recipient</label>
+        <input id="rel" value="best friend" autocomplete="off">
+      </div>
+    </div>
+    <div class="grid" style="margin-top:14px">
+      <div>
+        <label for="lang">Language</label>
+        <select id="lang">
+          <option value="en" selected>English</option>
+          <option value="pt">Português</option>
+          <option value="es">Español</option>
+          <option value="fr">Français</option>
+          <option value="de">Deutsch</option>
+          <option value="hi">हिन्दी</option>
+        </select>
+      </div>
+      <div>
+        <label for="tone">Tone</label>
+        <select id="tone">
+          <option value="warm" selected>Warm</option>
+          <option value="playful">Playful</option>
+          <option value="nostalgic">Nostalgic</option>
+          <option value="sincere">Sincere</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn" id="go" type="button">Generate three openings</button>
+    <p class="status" id="status" role="status" aria-live="polite"></p>
+  </div>
+
+  <div class="cards" id="cards"></div>
+
+  <p class="meta">
+    Transport: AES-256-GCM · key issued per session (15 min) · ciphertext + tag, HMAC-tagged
+    envelope. Model call goes to <code>127.0.0.1:31415</code> from the service, never from the
+    browser. If you see <code>session_required</code>, the service restarted — reload the page.
+  </p>
+</div>
+
+<script>
+(() => {
+  const SVC = (window.location.port === '8900' || !window.location.port) ? '' : 'http://127.0.0.1:8787';
+  const $ = (id) => document.getElementById(id);
+  const status = $('status'), cards = $('cards'), go = $('go');
+
+  const b64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+
+  async function session() {
+    const r = await fetch(SVC + '/api/ai/session', { cache: 'no-store' });
+    if (!r.ok) throw new Error('session ' + r.status);
+    return r.json();
+  }
+
+  async function decrypt(s, env) {
+    const key = await crypto.subtle.importKey('raw', b64(s.key), 'AES-GCM', false, ['decrypt']);
+    // WebCrypto expects ciphertext||tag, which is exactly what the service returns
+    const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64(env.iv) }, key, b64(env.ct));
+    return JSON.parse(new TextDecoder().decode(plain));
+  }
+
+  go.addEventListener('click', async () => {
+    go.disabled = true;
+    cards.innerHTML = '';
+    status.className = 'status';
+    status.textContent = 'Requesting a session key…';
+    try {
+      const s = await session();
+      status.textContent = 'Encrypted request in flight…';
+      const t0 = performance.now();
+      const res = await fetch(SVC + '/api/ai/gift-suggestions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-session': s.id },
+        body: JSON.stringify({
+          topic: $('topic').value,
+          relationship: $('rel').value,
+          language: $('lang').value,
+          tone: $('tone').value,
+        }),
+      });
+      const env = await res.json();
+      const data = await decrypt(s, env);
+      const ms = Math.round(performance.now() - t0);
+
+      if (data.error) throw new Error(data.error);
+      const list = data.suggestions || [];
+      if (!list.length) throw new Error('empty result');
+
+      cards.innerHTML = '';
+      for (const s2 of list) {
+        const el = document.createElement('article');
+        el.className = 'card';
+        const h = document.createElement('h3'); h.textContent = s2.title || 'Suggestion';
+        const p = document.createElement('p'); p.textContent = s2.text || '';
+        el.append(h, p);
+        if (s2.tone) { const t = document.createElement('span'); t.className = 'tone'; t.textContent = s2.tone; el.append(t); }
+        cards.append(el);
+      }
+      status.textContent = `${list.length} suggestions · decrypted in ${ms} ms · model ${data.model || 'auto'}`;
+    } catch (err) {
+      status.className = 'status err';
+      status.textContent = 'Failed: ' + (err && err.message ? err.message : err);
+    } finally {
+      go.disabled = false;
+    }
+  });
+})();
+</script>
+</body>
+</html>

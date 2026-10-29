@@ -1,0 +1,1 @@
+function s(o,n,r){const i=n.split(".").filter(Boolean);let e=o;for(const t of i)if(e&&typeof e=="object"&&t in e)e=e[t];else return r||n;return typeof e=="string"?e:r||n}function l(o,n){return o.replace(/\{\{\s*(\w+)\s*\}\}|\{(\w+)\}/g,(r,i,e)=>{const t=n[i||e||""];return t==null?"":String(t)})}export{l as i,s as t};

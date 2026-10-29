@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: birthday-website-2luv
+    env: node
+    plan: free
+    buildCommand: npm run build
+    startCommand: npm start
+    healthCheckPath: /api/ai/health
+    envVars:
+      - key: NODE_ENV
+        value: production

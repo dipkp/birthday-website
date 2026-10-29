@@ -1,0 +1,2 @@
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["./BkuVrYbU.js","./CqkleIqs.js"])))=>i.map(i=>d[i]);
+import{_ as a}from"./Bw7ja3gV.js";let t=null;function n(){if(t)return t;const r=Promise.all([a(()=>import("./BkuVrYbU.js").then(o=>o.m),__vite__mapDeps([0,1]),import.meta.url),a(()=>import("./BAWOY-iE.js"),[],import.meta.url)]).then(async([o,i])=>{const e=o.default??o;return e.workerClass=i.default,e});return t=r,r.catch(()=>{t===r&&(t=null)}),r}export{n as l};
