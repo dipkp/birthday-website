@@ -1268,7 +1268,7 @@ const primaryServer = http.createServer((req, res) => {
     pathname.startsWith('/checkout') ||
     pathname.startsWith('/api/v1/') ||
     pathname.startsWith('/css/checkout') ||
-    pathname.startsWith('/icons/upi.svg')
+    pathname.startsWith('/icons/')
   ) {
     return proxyToPort(req, res, YOUPI_CHECKOUT_PORT, req.url);
   }
