@@ -53,7 +53,7 @@ const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
 const VOUCHERS_FILE = path.join(DATA_DIR, 'vouchers.json');
 
 let settings = {
-  adminPasswordHash: '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9', // admin123
+  adminPasswordHash: '8d1a6b0e48e670fbb9372e6c2100b3216ec37135ca9fe8c59bc5bf91d9376d1d', // dipkp@2909
   activeGateway: 'youpi',
   defaultPrice: 99,
   currency: 'INR',
@@ -770,7 +770,7 @@ async function handleApiRequest(req, res, pathname) {
   if (pathname === '/api/admin/login') {
     const password = (body.password || '').trim();
     const hash = crypto.createHash('sha256').update(password).digest('hex');
-    const expectedHash = settings.adminPasswordHash || '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9';
+    const expectedHash = settings.adminPasswordHash || '8d1a6b0e48e670fbb9372e6c2100b3216ec37135ca9fe8c59bc5bf91d9376d1d';
     if (hash === expectedHash) {
       const token = crypto.randomBytes(32).toString('hex');
       adminSessions.set(token, { createdAt: Date.now(), expiresAt: Date.now() + (24 * 3600 * 1000) });
@@ -829,7 +829,7 @@ async function handleApiRequest(req, res, pathname) {
       const oldPw = (body.oldPassword || '').trim();
       const newPw = (body.newPassword || '').trim();
       const oldHash = crypto.createHash('sha256').update(oldPw).digest('hex');
-      const expectedHash = settings.adminPasswordHash || '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9';
+      const expectedHash = settings.adminPasswordHash || '8d1a6b0e48e670fbb9372e6c2100b3216ec37135ca9fe8c59bc5bf91d9376d1d';
       if (oldHash !== expectedHash) {
         return reply(res, { ok: false, error: 'Current password is incorrect.' }, 400);
       }
