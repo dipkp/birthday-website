@@ -19,6 +19,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const QRCode = require('qrcode');
 
 const WEB_PORT = Number(process.env.PORT || 8900);
 const API_PORT = Number(process.env.STUB_PORT || 8788);
@@ -26,9 +27,17 @@ const API_PORT = Number(process.env.STUB_PORT || 8788);
 const REPLICA_DIR = path.resolve(__dirname, '..', '2luv-replica');
 const DATA_DIR = path.join(__dirname, 'data');
 const LETTERS_FILE = path.join(DATA_DIR, 'letters.json');
+const UPLOADS_DIR = path.join(__dirname, 'uploads');
+const CHUNKS_DIR = path.join(UPLOADS_DIR, 'chunks');
 
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+if (!fs.existsSync(CHUNKS_DIR)) {
+  fs.mkdirSync(CHUNKS_DIR, { recursive: true });
 }
 
 let letters = {};
@@ -206,6 +215,29 @@ function markLetterAsPaid(letterRef) {
     letters[shareableLink] = target;
     letters[letterId] = target;
   }
+  if (!target) {
+    const letterId = 'letter-' + Date.now();
+    target = {
+      id: letterId,
+      shareableLink: letterRef,
+      status: 'published',
+      paid: true,
+      isPaid: true,
+      createdAt: new Date().toISOString(),
+      authorName: 'Alexander',
+      recipientName: 'Sophia',
+      theme: 'party',
+      message: 'Wishing you a very happy birthday filled with love, laughter, and magical moments!',
+      whatILove: "Your radiant smile and joyful laughter.\nThe wonderful way you light up every room.\nAll the unforgettable moments we share.\nYour kindness, warmth, and generous heart.\nThat every day is brighter with you in it.",
+      story: 'Every chapter together has been an adventure.',
+      dreams: 'To make many more memories.',
+      places: [],
+      photos: [],
+      musicUrl: ''
+    };
+    letters[letterRef] = target;
+    letters[letterId] = target;
+  }
   if (target) {
     target.paid = true;
     target.isPaid = true;
@@ -291,6 +323,11 @@ function proxyToPort(req, res, targetPort, pathnameWithSearch) {
   proxyReq.on('error', (err) => {
     console.error(`Proxy to port ${targetPort} error:`, err.message);
     if (!res.headersSent) {
+      if (targetPort === YOUPI_CHECKOUT_PORT) {
+        const proto = req.headers['x-forwarded-proto'] || 'http';
+        const host = req.headers.host || 'localhost:' + WEB_PORT;
+        return serveManualUpiCheckout(req, res, 'gift', `${proto}://${host}`);
+      }
       res.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' });
       res.end('Bad Gateway: Payment portal is loading, please refresh in a moment.');
     }
@@ -392,22 +429,23 @@ function serveManualUpiCheckout(req, res, letterRef, hostUrl) {
     <p style="color:#94a3b8; font-size:0.85rem;">Scan this QR with any UPI App (GPay, PhonePe, Paytm, BHIM)</p>
     
     <div class="qr-box">
-      <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiUri)}" alt="UPI QR Code" width="180" height="180" style="display:block;" />
+      <img id="upiQrImg" src="/api/qrcode?data=${encodeURIComponent(upiUri)}" alt="UPI QR Code" width="180" height="180" style="display:block; border-radius:8px;" />
+      <button type="button" onclick="downloadUpiQR()" style="margin-top:8px;background:#1e40af;color:#fff;border:none;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;width:100%;">⬇️ Download QR</button>
     </div>
 
     <div style="margin-bottom:1.25rem;">
-      <a href="${upiUri}" class="btn btn-upi">📲 Open UPI App on Phone</a>
+      <a id="openUpiBtn" href="${upiUri}" class="btn btn-upi">📲 Open UPI App on Phone</a>
       <div style="font-size:0.8rem; color:#94a3b8;">Or copy UPI ID: <strong style="color:#fff; cursor:pointer;" onclick="navigator.clipboard.writeText('${upiId}'); alert('UPI ID copied: ${upiId}');">${upiId} 📋</strong></div>
     </div>
 
     <!-- Voucher box -->
     <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:1rem; margin-bottom:1.25rem; text-align:left;">
-      <div style="font-size:0.8rem; font-weight:700; color:#cbd5e1; margin-bottom:0.4rem;">🎟️ Have a discount voucher?</div>
+      <div style="font-size:0.8rem; font-weight:700; color:#cbd5e1; margin-bottom:0.4rem;">🎟️ Have a discount voucher / promo code?</div>
       <div style="display:flex; gap:0.5rem;">
-        <input type="text" id="voucherCode" placeholder="Enter promo code" style="text-transform:uppercase; margin-bottom:0;" />
+        <input type="text" id="voucherCode" placeholder="e.g. FREEGIFT or LUVE50" style="text-transform:uppercase; margin-bottom:0;" />
         <button type="button" class="btn" style="width:auto; padding:0 1rem; background:#3b82f6; color:#fff;" onclick="applyVoucher()">Apply</button>
       </div>
-      <div id="voucherMsg" style="font-size:0.75rem; margin-top:0.4rem; display:none;"></div>
+      <div id="voucherMsg" style="font-size:0.75rem; margin-top:0.4rem; display:none; font-weight:600;"></div>
     </div>
 
     <!-- UTR Form -->
@@ -420,6 +458,8 @@ function serveManualUpiCheckout(req, res, letterRef, hostUrl) {
 
   <script>
     const letterRef = "${letterRef}";
+    let currentUpiUri = "${upiUri}";
+
     async function submitUtr(e) {
       e.preventDefault();
       const utr = document.getElementById('utrNumber').value.trim();
@@ -464,9 +504,14 @@ function serveManualUpiCheckout(req, res, letterRef, hostUrl) {
           msg.style.color = '#34d399';
           msg.textContent = data.message;
           document.getElementById('displayAmount').textContent = '₹' + data.finalPrice + '.00';
-          if (data.unlocked && data.redirectUrl) {
-            setTimeout(() => { window.location.href = data.redirectUrl; }, 800);
+          if (data.unlocked) {
+            setTimeout(() => { window.location.href = data.redirectUrl || ('/en/letter/' + encodeURIComponent(letterRef) + '?payment=success'); }, 800);
+            return;
           }
+          const newPrice = data.finalPrice;
+          currentUpiUri = 'upi://pay?pa=' + encodeURIComponent('${upiId}') + '&pn=' + encodeURIComponent('${payee}') + '&am=' + newPrice + '.00&cu=INR&tn=' + encodeURIComponent(letterRef || 'Luve-Gift');
+          document.getElementById('upiQrImg').src = '/api/qrcode?data=' + encodeURIComponent(currentUpiUri);
+          document.getElementById('openUpiBtn').href = currentUpiUri;
         } else {
           msg.style.color = '#f43f5e';
           msg.textContent = data.error || 'Invalid code';
@@ -476,6 +521,10 @@ function serveManualUpiCheckout(req, res, letterRef, hostUrl) {
         msg.style.color = '#f43f5e';
         msg.textContent = 'Failed to apply voucher';
       }
+    }
+
+    function downloadUpiQR() {
+      window.location.href = '/api/download-qr?data=' + encodeURIComponent(currentUpiUri) + '&filename=upi-payment-qr.png';
     }
   </script>
 </body>
@@ -707,17 +756,24 @@ function reply(res, obj, code = 200) {
   res.end(JSON.stringify(obj));
 }
 
+function readRawBody(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    req.on('data', chunk => chunks.push(chunk));
+    req.on('end', () => resolve(Buffer.concat(chunks)));
+    req.on('error', reject);
+  });
+}
+
 function parseBody(req) {
   return new Promise((resolve) => {
-    let body = '';
-    req.on('data', chunk => { body += chunk; });
-    req.on('end', () => {
+    readRawBody(req).then(buf => {
       try {
-        resolve(body ? JSON.parse(body) : {});
+        resolve(buf.length > 0 ? JSON.parse(buf.toString('utf8')) : {});
       } catch {
-        resolve({ raw: body });
+        resolve({ raw: buf.toString('utf8') });
       }
-    });
+    }).catch(() => resolve({}));
   });
 }
 
@@ -750,7 +806,181 @@ async function handleApiRequest(req, res, pathname) {
     return res.end();
   }
 
-  const body = (req.method === 'POST' || req.method === 'PUT') ? await parseBody(req) : {};
+  let rawBuffer = Buffer.alloc(0);
+  let body = {};
+  if (req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH') {
+    rawBuffer = await readRawBody(req);
+    try {
+      body = rawBuffer.length > 0 ? JSON.parse(rawBuffer.toString('utf8')) : {};
+    } catch {
+      body = { raw: rawBuffer.toString('utf8') };
+    }
+  }
+
+  // Direct High-Performance Local QR Code Generator & Native Downloader
+  if (pathname === '/api/qrcode' || pathname === '/api/download-qr') {
+    const u = new URL(req.url, 'http://localhost');
+    const data = u.searchParams.get('data') || 'https://2-luv.com';
+    const filename = u.searchParams.get('filename') || 'gift-qr-code.png';
+    const isDownload = pathname === '/api/download-qr' || u.searchParams.get('download') === '1';
+
+    try {
+      const buffer = await QRCode.toBuffer(data, {
+        width: 450,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#ffffff'
+        }
+      });
+
+      const headers = {
+        'Content-Type': 'image/png',
+        'Content-Length': buffer.length,
+        'Cache-Control': 'public, max-age=86400'
+      };
+      if (isDownload) {
+        headers['Content-Disposition'] = `attachment; filename="${filename}"`;
+      }
+      res.writeHead(200, headers);
+      return res.end(buffer);
+    } catch (err) {
+      console.error('QR generation error:', err);
+      res.writeHead(500, { 'Content-Type': 'text/plain' });
+      return res.end('Error generating QR code');
+    }
+  }
+
+  // Direct R2 Part Upload / Serve Handlers
+  if (pathname.startsWith('/__r2-part/uploads/')) {
+    const filename = path.basename(pathname);
+    if (req.method === 'PUT' || req.method === 'POST') {
+      const ext = (filename.endsWith('.jpg') || filename.endsWith('.png') || filename.endsWith('.webp')) ? '' : '.jpg';
+      const finalName = filename + ext;
+      const targetFile = path.join(UPLOADS_DIR, finalName);
+      fs.writeFileSync(targetFile, rawBuffer);
+      return reply(res, { ok: true, key: filename, url: `/uploads/${finalName}`, previewUrl: `/uploads/${finalName}` });
+    }
+    return serveUploadedFile(req, res, pathname);
+  }
+
+  // Legacy/Direct Image Upload Endpoints
+  if (pathname === '/upload-image' || pathname === '/api/upload-image') {
+    const filename = `img-${Date.now()}.jpg`;
+    fs.writeFileSync(path.join(UPLOADS_DIR, filename), rawBuffer);
+    return reply(res, {
+      ok: true,
+      url: `/uploads/${filename}`,
+      previewUrl: `/uploads/${filename}`,
+      status: 'ready'
+    });
+  }
+
+  // Audio Proxy & Streaming for background music and voice notes
+  if (pathname === '/api/audio-proxy') {
+    const u = new URL(req.url, 'http://localhost');
+    const audioUrl = u.searchParams.get('url');
+    if (!audioUrl) {
+      res.writeHead(400, { 'Content-Type': 'text/plain' });
+      return res.end('Missing url parameter');
+    }
+
+    // Check if audio file exists locally in REPLICA_DIR
+    let localCandidate = null;
+    try {
+      const parsedUrl = new URL(audioUrl, 'http://localhost');
+      let cleanPath = parsedUrl.pathname.replace(/^\//, '');
+      let localPath = path.join(REPLICA_DIR, cleanPath.replace(/\//g, path.sep));
+      if (fs.existsSync(localPath) && fs.statSync(localPath).isFile()) {
+        localCandidate = localPath;
+      }
+    } catch (e) {}
+
+    if (localCandidate) {
+      const stat = fs.statSync(localCandidate);
+      const ext = path.extname(localCandidate).toLowerCase();
+      const mimeType = MIME_TYPES[ext] || 'audio/mpeg';
+
+      const range = req.headers.range;
+      if (range) {
+        const parts = range.replace(/bytes=/, '').split('-');
+        const start = parseInt(parts[0], 10);
+        const end = parts[1] ? parseInt(parts[1], 10) : stat.size - 1;
+        const chunksize = (end - start) + 1;
+        const file = fs.createReadStream(localCandidate, { start, end });
+        res.writeHead(206, {
+          'Content-Range': `bytes ${start}-${end}/${stat.size}`,
+          'Accept-Ranges': 'bytes',
+          'Content-Length': chunksize,
+          'Content-Type': mimeType,
+          'Access-Control-Allow-Origin': '*'
+        });
+        return file.pipe(res);
+      } else {
+        res.writeHead(200, {
+          'Content-Length': stat.size,
+          'Content-Type': mimeType,
+          'Accept-Ranges': 'bytes',
+          'Access-Control-Allow-Origin': '*'
+        });
+        return fs.createReadStream(localCandidate).pipe(res);
+      }
+    }
+
+    // Proxy from remote HTTP/HTTPS
+    try {
+      const targetUrl = new URL(audioUrl);
+      const client = targetUrl.protocol === 'https:' ? https : http;
+      const proxyReq = client.get(audioUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+          ...(req.headers.range ? { range: req.headers.range } : {})
+        }
+      }, proxyRes => {
+        const headers = {
+          'Access-Control-Allow-Origin': '*',
+          'Accept-Ranges': 'bytes',
+          'Content-Type': proxyRes.headers['content-type'] || 'audio/mpeg'
+        };
+        if (proxyRes.headers['content-length']) headers['Content-Length'] = proxyRes.headers['content-length'];
+        if (proxyRes.headers['content-range']) headers['Content-Range'] = proxyRes.headers['content-range'];
+
+        res.writeHead(proxyRes.statusCode || 200, headers);
+        proxyRes.pipe(res);
+      });
+
+      proxyReq.on('error', err => {
+        console.error('Audio proxy fetch error:', err.message);
+        const fallbackAudio = path.join(REPLICA_DIR, 'themes', 'party', 'v1', 'audio', 'bed-celebration.mp3');
+        if (fs.existsSync(fallbackAudio)) {
+          const stat = fs.statSync(fallbackAudio);
+          res.writeHead(200, {
+            'Content-Length': stat.size,
+            'Content-Type': 'audio/mpeg',
+            'Accept-Ranges': 'bytes',
+            'Access-Control-Allow-Origin': '*'
+          });
+          return fs.createReadStream(fallbackAudio).pipe(res);
+        }
+        res.writeHead(502, { 'Content-Type': 'text/plain' });
+        res.end('Audio fetch failed');
+      });
+      return;
+    } catch (err) {
+      console.error('Invalid audio URL:', err.message);
+      res.writeHead(400, { 'Content-Type': 'text/plain' });
+      return res.end('Invalid audio URL');
+    }
+  }
+
+  // Token refresh & Privacy session stub handlers
+  if (pathname === '/api/refresh-sas') {
+    return reply(res, { ok: true, newSasUrl: body?.blobUrl || '', expiresAt: Date.now() + 360 * 60 * 1000 });
+  }
+
+  if (pathname === '/api/privacy/session/delete') {
+    return reply(res, { ok: true });
+  }
 
   // Pricing -> ₹99
   if (pathname === '/api/pricing/landing') {
@@ -908,6 +1138,31 @@ async function handleApiRequest(req, res, pathname) {
           target.isPaid = target.paid;
           saveLetters();
           return reply(res, { ok: true, paid: target.paid });
+        }
+        return reply(res, { ok: false, error: 'Letter not found' }, 404);
+      }
+
+      if (parts[1] === 'set-date' && req.method === 'POST') {
+        const target = letters[ref] || Object.values(letters).find(l => l.shareableLink === ref || l.id === ref);
+        if (target) {
+          const bDate = (body.birthdayDate || body.date || '').trim();
+          target.birthdayDate = bDate || null;
+          target.unlockDate = bDate || null;
+          target.specialDate = bDate || '';
+          if (bDate) {
+            const dateParts = bDate.split('-');
+            if (dateParts.length === 3) {
+              target.birthdayYear = parseInt(dateParts[0], 10);
+              target.birthdayMonth = parseInt(dateParts[1], 10);
+              target.birthdayDay = parseInt(dateParts[2], 10);
+            }
+          } else {
+            target.birthdayDay = null;
+            target.birthdayMonth = null;
+            target.birthdayYear = null;
+          }
+          saveLetters();
+          return reply(res, { ok: true, letter: target });
         }
         return reply(res, { ok: false, error: 'Letter not found' }, 404);
       }
@@ -1199,14 +1454,131 @@ async function handleApiRequest(req, res, pathname) {
 
     // Photo uploads handling
     if (action === 'photos') {
-      return reply(res, {
-        ok: true,
-        status: 'ready',
-        chunkSize: 5242880,
-        receivedChunks: [0],
-        photoId: parts[2] || 'local-photo-' + Date.now(),
-        previewUrl: ''
-      });
+      const photoId = parts[2] || ('photo-' + Date.now());
+      const versionId = parts[3] || 'v1';
+      const subAction = parts[4] || '';
+
+      // 1. Chunk Ticket (/photos/:id/:v/chunks/:idx/ticket)
+      if (subAction === 'chunks' && (parts[6] === 'ticket' || req.url.endsWith('/ticket'))) {
+        const chunkIndex = parts[5] || '0';
+        const key = `${draftId}-${photoId}-${versionId}-${chunkIndex}`;
+        const proto = req.headers['x-forwarded-proto'] || 'http';
+        const host = req.headers.host ? `${proto}://${req.headers.host}` : '';
+        return reply(res, {
+          ok: true,
+          ticket: 'ticket-' + Date.now(),
+          url: `${host}/__r2-part/uploads/creation/${key}`,
+          uploadUrl: `${host}/__r2-part/uploads/creation/${key}`,
+          expiresAt: Date.now() + 3600000
+        });
+      }
+
+      // 2. Chunk Ack (/photos/:id/:v/chunks/:idx/ack)
+      if (subAction === 'chunks' && (parts[6] === 'ack' || req.url.endsWith('/ack'))) {
+        return reply(res, { ok: true, acknowledged: true });
+      }
+
+      // 3. Binary Chunk Upload (/photos/:id/:v/chunks/:idx)
+      if (subAction === 'chunks' && (req.method === 'POST' || req.method === 'PUT')) {
+        const chunkIndex = parts[5] || '0';
+        const chunkFile = path.join(CHUNKS_DIR, `${draftId}_${photoId}_${versionId}_${chunkIndex}.chunk`);
+        fs.writeFileSync(chunkFile, rawBuffer);
+        return reply(res, {
+          ok: true,
+          status: 'uploaded',
+          chunkIndex: parseInt(chunkIndex, 10),
+          receivedBytes: rawBuffer.length
+        });
+      }
+
+      // 4. Complete Upload (/photos/:id/:v/complete)
+      if (subAction === 'complete' && req.method === 'POST') {
+        const prefix = `${draftId}_${photoId}_${versionId}_`;
+        let chunkFiles = [];
+        try {
+          chunkFiles = fs.readdirSync(CHUNKS_DIR)
+            .filter(f => f.startsWith(prefix) && f.endsWith('.chunk'))
+            .sort((a, b) => {
+              const idxA = parseInt(a.replace(prefix, '').replace('.chunk', ''), 10);
+              const idxB = parseInt(b.replace(prefix, '').replace('.chunk', ''), 10);
+              return idxA - idxB;
+            });
+        } catch {}
+
+        let finalBuffer = Buffer.alloc(0);
+        if (chunkFiles.length > 0) {
+          const buffers = chunkFiles.map(f => fs.readFileSync(path.join(CHUNKS_DIR, f)));
+          finalBuffer = Buffer.concat(buffers);
+          for (const f of chunkFiles) {
+            try { fs.unlinkSync(path.join(CHUNKS_DIR, f)); } catch {}
+          }
+        } else if (rawBuffer && rawBuffer.length > 0) {
+          finalBuffer = rawBuffer;
+        }
+
+        let ext = '.jpg';
+        if (finalBuffer.length > 4) {
+          if (finalBuffer[0] === 0xFF && finalBuffer[1] === 0xD8 && finalBuffer[2] === 0xFF) ext = '.jpg';
+          else if (finalBuffer[0] === 0x89 && finalBuffer[1] === 0x50 && finalBuffer[2] === 0x4E && finalBuffer[3] === 0x47) ext = '.png';
+          else if (finalBuffer.slice(0, 4).toString() === 'RIFF' && finalBuffer.slice(8, 12).toString() === 'WEBP') ext = '.webp';
+        }
+
+        const filename = `photo-${draftId}-${photoId}${ext}`;
+        if (finalBuffer.length > 0) {
+          fs.writeFileSync(path.join(UPLOADS_DIR, filename), finalBuffer);
+        }
+
+        const photoUrl = `/uploads/${filename}`;
+        if (!drafts[draftId]) {
+          drafts[draftId] = { draftId, revision: 0, payload: {}, photos: [], uploads: [] };
+        }
+        if (!drafts[draftId].savedPhotos) drafts[draftId].savedPhotos = {};
+        drafts[draftId].savedPhotos[photoId] = {
+          id: photoId,
+          photoId: photoId,
+          url: photoUrl,
+          previewUrl: photoUrl,
+          filename: filename,
+          status: 'ready'
+        };
+
+        return reply(res, {
+          ok: true,
+          status: 'ready',
+          photoId: photoId,
+          previewUrl: photoUrl,
+          url: photoUrl
+        });
+      }
+
+      // 5. Initialize Photo Upload (PUT /photos/:id/:v)
+      if (req.method === 'PUT') {
+        return reply(res, {
+          ok: true,
+          status: 'uploading',
+          chunkSize: 5242880,
+          receivedChunks: [],
+          directUpload: false,
+          photoId: photoId
+        });
+      }
+
+      // 6. Query Photo Status (GET /photos/:id/:v)
+      if (req.method === 'GET') {
+        const saved = drafts[draftId]?.savedPhotos?.[photoId];
+        if (saved) {
+          return reply(res, {
+            ok: true,
+            status: 'ready',
+            photoId: photoId,
+            previewUrl: saved.previewUrl,
+            url: saved.url
+          });
+        }
+        return reply(res, { ok: false, status: 'pending', error: 'Not ready' }, 404);
+      }
+
+      return reply(res, { ok: true, status: 'ready', photoId: photoId, previewUrl: '' });
     }
 
     if (action === 'ticket') {
@@ -1242,55 +1614,102 @@ async function handleApiRequest(req, res, pathname) {
       let paymentId = '';
       let checkoutUrl = '';
 
-      try {
-        const youpiRes = await new Promise((resolve, reject) => {
-          const pLoad = JSON.stringify({
-            orderId: orderId,
-            amount: PRICE_INR,
-            currency: 'INR',
-            returnUrl: returnUrl
-          });
-          const preq = http.request({
-            hostname: '127.0.0.1',
-            port: YOUPI_API_PORT,
-            path: '/api/v1/payments',
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Merchant-Id': MERCHANT_ID,
-              'Content-Length': Buffer.byteLength(pLoad)
-            }
-          }, (pres) => {
-            let data = '';
-            pres.on('data', chunk => data += chunk);
-            pres.on('end', () => {
-              try { resolve({ status: pres.statusCode, body: JSON.parse(data) }); }
-              catch(e) { resolve({ status: pres.statusCode, body: data }); }
+      if (settings.activeGateway === 'youpi' && settings.youpi?.enabled) {
+        try {
+          const youpiRes = await new Promise((resolve, reject) => {
+            const pLoad = JSON.stringify({
+              orderId: orderId,
+              amount: PRICE_INR,
+              currency: 'INR',
+              returnUrl: returnUrl
             });
+            const preq = http.request({
+              hostname: '127.0.0.1',
+              port: YOUPI_API_PORT,
+              path: '/api/v1/payments',
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Merchant-Id': MERCHANT_ID,
+                'Content-Length': Buffer.byteLength(pLoad)
+              }
+            }, (pres) => {
+              let data = '';
+              pres.on('data', chunk => data += chunk);
+              pres.on('end', () => {
+                try { resolve({ status: pres.statusCode, body: JSON.parse(data) }); }
+                catch(e) { resolve({ status: pres.statusCode, body: data }); }
+              });
+            });
+            preq.on('error', reject);
+            preq.write(pLoad);
+            preq.end();
           });
-          preq.on('error', reject);
-          preq.write(pLoad);
-          preq.end();
-        });
 
-        if (youpiRes.status === 201 && youpiRes.body?.paymentId) {
-          paymentId = youpiRes.body.paymentId;
-          checkoutUrl = `${hostUrl}/checkout/${paymentId}`;
-          paymentSessions[paymentId] = {
-            orderId,
-            paymentId,
-            letterRef: shareableLink,
-            amount: PRICE_INR,
-            status: 'INITIATED',
-            createdAt: Date.now()
-          };
+          if (youpiRes.status === 201 && youpiRes.body?.paymentId) {
+            paymentId = youpiRes.body.paymentId;
+            checkoutUrl = `${hostUrl}/checkout/${paymentId}`;
+            paymentSessions[paymentId] = {
+              orderId,
+              paymentId,
+              letterRef: shareableLink,
+              amount: PRICE_INR,
+              status: 'INITIATED',
+              createdAt: Date.now()
+            };
+          }
+        } catch (e) {
+          console.error('Failed to create checkout session in finalize:', e);
         }
-      } catch (e) {
-        console.error('Failed to create checkout session in finalize:', e);
       }
 
-      if (!checkoutUrl && paymentId) {
-        checkoutUrl = `${hostUrl}/checkout/${paymentId}`;
+      if (!checkoutUrl) {
+        checkoutUrl = `${hostUrl}/pay?letter=${encodeURIComponent(shareableLink)}`;
+      }
+
+      // Collect photos from all possible draft sources
+      const rawPhotos = (payload.photos && payload.photos.length) ? payload.photos :
+                        (body.photos && body.photos.length) ? body.photos :
+                        (draft.photosManifest && draft.photosManifest.length) ? draft.photosManifest :
+                        (draft.photos && draft.photos.length) ? draft.photos :
+                        (draft.uploads && draft.uploads.length) ? draft.uploads : [];
+
+      const savedMap = draft.savedPhotos || {};
+
+      let finalPhotos = rawPhotos.map((p, idx) => {
+        const pid = p.photoId || p.id || ('photo-' + idx);
+        const saved = savedMap[pid] || Object.values(savedMap)[idx] || {};
+        let pUrl = p.url || p.uploadedUrl || saved.url || saved.previewUrl || '';
+
+        if (!pUrl || pUrl.startsWith('blob:')) {
+          const defaultName = `photo-${draftId}-${pid}.jpg`;
+          if (fs.existsSync(path.join(UPLOADS_DIR, defaultName))) {
+            pUrl = `/uploads/${defaultName}`;
+          } else if (saved.filename && fs.existsSync(path.join(UPLOADS_DIR, saved.filename))) {
+            pUrl = `/uploads/${saved.filename}`;
+          }
+        }
+
+        return {
+          id: pid,
+          photoId: pid,
+          url: pUrl,
+          previewUrl: pUrl,
+          caption: (p.caption || '').trim(),
+          order: typeof p.order === 'number' ? p.order : idx,
+          date: p.date || ''
+        };
+      });
+
+      if (finalPhotos.length === 0 && Object.keys(savedMap).length > 0) {
+        finalPhotos = Object.values(savedMap).map((sp, idx) => ({
+          id: sp.photoId || sp.id || ('photo-' + idx),
+          photoId: sp.photoId || sp.id || ('photo-' + idx),
+          url: sp.url,
+          previewUrl: sp.previewUrl || sp.url,
+          caption: sp.caption || '',
+          order: idx
+        }));
       }
 
       const isDraftPaid = Boolean(draft.paid || draft.isPaid);
@@ -1315,12 +1734,13 @@ async function handleApiRequest(req, res, pathname) {
         story: payload.ourStory || payload.story || '',
         dreams: payload.dreams || '',
         places: payload.places || [],
-        photos: payload.photos || [],
+        photos: finalPhotos,
         musicUrl: payload.musicUrl || '',
-        specialDate: payload.specialDate || '',
-        birthdayDay: payload.birthdayDay || null,
-        birthdayMonth: payload.birthdayMonth || null,
-        birthdayYear: payload.birthdayYear || null
+        specialDate: payload.specialDate || payload.birthdayDate || payload.date || (payload.birthday && payload.birthday.year ? `${payload.birthday.year}-${String(payload.birthday.month || '').padStart(2, '0')}-${String(payload.birthday.day || '').padStart(2, '0')}` : '') || '',
+        birthdayDay: payload.birthdayDay || (payload.birthday && payload.birthday.day) || null,
+        birthdayMonth: payload.birthdayMonth || (payload.birthday && payload.birthday.month) || null,
+        birthdayYear: payload.birthdayYear || (payload.birthday && payload.birthday.year) || null,
+        unlockDate: payload.unlockDate || payload.birthdayDate || null
       };
 
       letters[shareableLink] = newLetter;
@@ -1357,6 +1777,8 @@ async function handleApiRequest(req, res, pathname) {
         status: 'draft',
         payload: body.payload || cur.payload || {},
         photos: body.photos || cur.photos || [],
+        photosManifest: body.photos || cur.photosManifest || [],
+        savedPhotos: cur.savedPhotos || {},
         uploads: cur.uploads || [],
         updatedAt: Date.now()
       };
@@ -1495,6 +1917,12 @@ async function handleApiRequest(req, res, pathname) {
     const rawLink = pathname.replace('/api/letter/', '').replace(/\/metadata$/, '');
     const link = decodeURIComponent(rawLink);
 
+    try {
+      if (fs.existsSync(LETTERS_FILE)) {
+        letters = JSON.parse(fs.readFileSync(LETTERS_FILE, 'utf8'));
+      }
+    } catch (e) {}
+
     let letter = letters[link] || Object.values(letters).find(l => l.shareableLink === link || l.id === link);
 
     if (!letter) {
@@ -1602,47 +2030,603 @@ async function handleApiRequest(req, res, pathname) {
   reply(res, { ok: true, stub: true, path: pathname, authority: 'admin', paid: true });
 }
 
-function renderLetterShell(locale, link, letter, hostUrl = '') {
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function getLetterBirthdayDate(letter) {
+  if (!letter) return null;
+  const now = new Date();
+  const currentYear = now.getFullYear();
+
+  let day = null;
+  let month = null; // 0-indexed
+  let year = null;
+
+  // 1. From birthdayDay & birthdayMonth
+  if (letter.birthdayDay && letter.birthdayMonth) {
+    day = parseInt(letter.birthdayDay, 10);
+    month = parseInt(letter.birthdayMonth, 10) - 1;
+    if (letter.birthdayYear) year = parseInt(letter.birthdayYear, 10);
+  }
+
+  // 2. From unlockDate, birthdayDate, or specialDate
+  const rawDate = letter.unlockDate || letter.birthdayDate || letter.specialDate;
+  if ((day === null || month === null) && rawDate) {
+    const dateStr = String(rawDate).split('T')[0].trim();
+    const parts = dateStr.split(/[-/]/);
+    if (parts.length === 3) {
+      let p0 = parseInt(parts[0], 10);
+      let p1 = parseInt(parts[1], 10);
+      let p2 = parseInt(parts[2], 10);
+      if (p0 > 1000) { // YYYY-MM-DD
+        year = p0;
+        month = p1 - 1;
+        day = p2;
+      } else { // DD-MM-YYYY
+        day = p0;
+        month = p1 - 1;
+        year = p2;
+      }
+    } else {
+      const d = new Date(rawDate);
+      if (!isNaN(d.getTime())) {
+        day = d.getDate();
+        month = d.getMonth();
+        year = d.getFullYear();
+      }
+    }
+  }
+
+  if (day === null || month === null || isNaN(day) || isNaN(month) || month < 0 || month > 11 || day < 1 || day > 31) {
+    return null;
+  }
+
+  // If today is the birthday (same month and same day)
+  if (now.getMonth() === month && now.getDate() === day) {
+    // Return start of today so now >= target (unlocked!)
+    return new Date(currentYear, month, day, 0, 0, 0, 0);
+  }
+
+  // Calculate target for current year
+  let target = new Date(currentYear, month, day, 0, 0, 0, 0);
+
+  // If year is in the future (e.g. specific future event), keep that year
+  if (year && year > currentYear) {
+    target = new Date(year, month, day, 0, 0, 0, 0);
+  } else {
+    // If birthday date this year has already passed, next occurrence is next year
+    const created = letter.createdAt ? new Date(letter.createdAt) : now;
+    const createdStartOfDay = new Date(created.getFullYear(), created.getMonth(), created.getDate(), 0, 0, 0, 0);
+    if (target.getTime() < createdStartOfDay.getTime()) {
+      target = new Date(currentYear + 1, month, day, 0, 0, 0, 0);
+    }
+  }
+
+  return target;
+}
+
+function renderBirthdayLockPage(locale, link, letter, hostUrl = '', targetDate) {
+  const recipient = letter.recipientName || 'My Love';
+  const author = letter.authorName || '';
+  const canonicalUrl = hostUrl ? (hostUrl + '/' + locale + '/letter/' + link) : ('/' + locale + '/letter/' + link);
+  const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+  const formattedDate = targetDate.toLocaleDateString(locale === 'ar' ? 'ar' : 'en-US', options);
+  const targetEpoch = targetDate.getTime();
+  const previewUrl = canonicalUrl + '?preview=true';
+
+  return `<!doctype html>
+<html lang="${locale}" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>🔒 Shhh! Birthday Surprise for ${escapeHtml(recipient)} | 2luv</title>
+<style>
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 50% 20%, #2e1065 0%, #170738 50%, #080214 100%);
+  color: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  overflow-x: hidden;
+  position: relative;
+}
+.ambient-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 1;
+}
+.balloon {
+  position: absolute;
+  width: 32px;
+  height: 40px;
+  border-radius: 50% 50% 50% 50% / 40% 40% 60% 60%;
+  opacity: 0.25;
+  animation: floatUp 16s linear infinite;
+}
+.balloon::after {
+  content: "";
+  position: absolute;
+  bottom: -12px;
+  left: 50%;
+  width: 1px;
+  height: 12px;
+  background: rgba(255,255,255,0.4);
+}
+@keyframes floatUp {
+  0% { transform: translateY(110vh) rotate(0deg); }
+  100% { transform: translateY(-20vh) rotate(360deg); }
+}
+.sparkle {
+  position: absolute;
+  background: #fff;
+  border-radius: 50%;
+  animation: twinkle 3s ease-in-out infinite;
+}
+@keyframes twinkle {
+  0%, 100% { opacity: 0.2; transform: scale(0.6); }
+  50% { opacity: 0.9; transform: scale(1.3); }
+}
+.lock-card {
+  position: relative;
+  z-index: 10;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(25px);
+  -webkit-backdrop-filter: blur(25px);
+  border-radius: 32px;
+  box-shadow: 0 35px 80px rgba(0, 0, 0, 0.6), 0 0 50px rgba(225, 29, 72, 0.15);
+  padding: 40px 28px 32px;
+  max-width: 480px;
+  width: 92%;
+  text-align: center;
+  animation: cardIn 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(30px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.cake-lock-icon {
+  position: relative;
+  width: 100px;
+  height: 100px;
+  margin: 0 auto 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: floatIcon 3.5s ease-in-out infinite;
+}
+@keyframes floatIcon {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+.cake-lock-icon .glow-disc {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(244,63,94,0.4) 0%, rgba(244,63,94,0) 70%);
+  animation: pulseGlow 2.5s ease-in-out infinite;
+}
+@keyframes pulseGlow {
+  0%, 100% { transform: scale(1); opacity: 0.6; }
+  50% { transform: scale(1.2); opacity: 0.9; }
+}
+.cake-lock-icon .cake {
+  font-size: 64px;
+  line-height: 1;
+  position: relative;
+  z-index: 2;
+  filter: drop-shadow(0 8px 16px rgba(0,0,0,0.4));
+}
+.cake-lock-icon .lock-badge {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  background: #f59e0b;
+  color: #fff;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5), 0 0 10px rgba(245,158,11,0.6);
+  border: 2px solid #fff;
+  z-index: 3;
+}
+.pill {
+  display: inline-block;
+  background: linear-gradient(90deg, rgba(225,29,72,0.25), rgba(244,63,94,0.25));
+  border: 1px solid rgba(244,63,94,0.5);
+  color: #fda4af;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 6px 14px;
+  border-radius: 20px;
+  margin-bottom: 14px;
+}
+h1 {
+  font-size: 24px;
+  font-weight: 800;
+  margin: 0 0 10px;
+  line-height: 1.3;
+  color: #fff;
+  letter-spacing: -0.5px;
+}
+.highlight-name {
+  color: #fb7185;
+  background: linear-gradient(90deg, #fb7185, #f43f5e);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+p.desc {
+  font-size: 14px;
+  line-height: 1.55;
+  color: #cbd5e1;
+  margin: 0 0 24px;
+}
+.countdown-box {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 18px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  margin-bottom: 22px;
+}
+.cd-unit {
+  text-align: center;
+  flex: 1;
+}
+.cd-num {
+  font-size: 32px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  line-height: 1;
+  margin-bottom: 4px;
+  text-shadow: 0 2px 10px rgba(244,63,94,0.4);
+}
+.cd-lbl {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #94a3b8;
+}
+.cd-sep {
+  font-size: 26px;
+  font-weight: 700;
+  color: #f43f5e;
+  opacity: 0.7;
+  user-select: none;
+  padding-bottom: 12px;
+}
+.unlock-chip {
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 14px;
+  padding: 10px 14px;
+  font-size: 12px;
+  color: #fef08a;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.btn-group {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.btn {
+  flex: 1;
+  padding: 12px 16px;
+  border-radius: 14px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+.btn-primary {
+  background: linear-gradient(135deg, #e11d48, #be123c);
+  color: #fff;
+  box-shadow: 0 6px 20px rgba(225, 29, 72, 0.4);
+}
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(225, 29, 72, 0.6);
+}
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+.author-link {
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 14px;
+}
+.author-link a {
+  color: #fda4af;
+  text-decoration: underline;
+  cursor: pointer;
+}
+#confettiCanvas {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+}
+</style>
+</head>
+<body>
+<canvas id="confettiCanvas"></canvas>
+<div class="ambient-bg" id="ambientBg"></div>
+
+<div class="lock-card">
+  <div class="cake-lock-icon">
+    <div class="glow-disc"></div>
+    <div class="cake">🎂</div>
+    <div class="lock-badge">🔒</div>
+  </div>
+
+  <div class="pill">✨ Special Birthday Surprise ✨</div>
+
+  <h1>Shhh! No Peeking Early, <span class="highlight-name">${escapeHtml(recipient)}</span>! 🤫</h1>
+
+  <p class="desc">
+    A magical interactive birthday gift has been prepared for you${author ? ' with all love by <strong>' + escapeHtml(author) + '</strong>' : ''}.<br>
+    It will automatically unlock on your birthday!
+  </p>
+
+  <div class="countdown-box">
+    <div class="cd-unit"><div class="cd-num" id="cdDays">00</div><div class="cd-lbl">Days</div></div>
+    <div class="cd-sep">:</div>
+    <div class="cd-unit"><div class="cd-num" id="cdHours">00</div><div class="cd-lbl">Hours</div></div>
+    <div class="cd-sep">:</div>
+    <div class="cd-unit"><div class="cd-num" id="cdMins">00</div><div class="cd-lbl">Mins</div></div>
+    <div class="cd-sep">:</div>
+    <div class="cd-unit"><div class="cd-num" id="cdSecs">00</div><div class="cd-lbl">Secs</div></div>
+  </div>
+
+  <div class="unlock-chip">
+    <span>🔒</span>
+    <span>Unlocks on <strong>${formattedDate}</strong> at 12:00 AM (Midnight)</span>
+  </div>
+
+  <div class="btn-group">
+    <button class="btn btn-primary" onclick="downloadCalendarReminder()">
+      🔔 Remind Me
+    </button>
+    <button class="btn btn-secondary" id="copyBtn" onclick="copyGiftLink()">
+      📋 Save Link
+    </button>
+  </div>
+
+  <div class="author-link">
+    Are you the sender? <a href="${previewUrl}">Preview Gift</a>
+  </div>
+</div>
+
+<script>
+(function(){
+  const bg = document.getElementById('ambientBg');
+  const colors = ['#f43f5e', '#a855f7', '#3b82f6', '#ec4899', '#f59e0b'];
+  for (let i = 0; i < 16; i++) {
+    const b = document.createElement('div');
+    b.className = 'balloon';
+    b.style.left = Math.random() * 100 + '%';
+    b.style.backgroundColor = colors[i % colors.length];
+    b.style.animationDelay = (Math.random() * 14) + 's';
+    b.style.animationDuration = (12 + Math.random() * 8) + 's';
+    bg.appendChild(b);
+  }
+  for (let j = 0; j < 30; j++) {
+    const s = document.createElement('div');
+    s.className = 'sparkle';
+    const sz = 2 + Math.random() * 4;
+    s.style.width = sz + 'px';
+    s.style.height = sz + 'px';
+    s.style.left = Math.random() * 100 + '%';
+    s.style.top = Math.random() * 100 + '%';
+    s.style.animationDelay = (Math.random() * 3) + 's';
+    bg.appendChild(s);
+  }
+})();
+
+const targetTime = ${targetEpoch};
+let unlocked = false;
+
+function tick() {
+  const now = Date.now();
+  const diff = targetTime - now;
+  if (diff <= 0) {
+    if (!unlocked) {
+      unlocked = true;
+      triggerUnlockCelebration();
+    }
+    return;
+  }
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  const secs = Math.floor((diff % (1000 * 60)) / 1000);
+
+  document.getElementById('cdDays').textContent = String(days).padStart(2, '0');
+  document.getElementById('cdHours').textContent = String(hours).padStart(2, '0');
+  document.getElementById('cdMins').textContent = String(mins).padStart(2, '0');
+  document.getElementById('cdSecs').textContent = String(secs).padStart(2, '0');
+}
+setInterval(tick, 1000);
+tick();
+
+function triggerUnlockCelebration() {
+  document.querySelector('.pill').textContent = "🎉 IT IS TIME!";
+  document.querySelector('h1').innerHTML = "🎉 Happy Birthday, <span class='highlight-name'>${escapeHtml(recipient)}</span>! 🎉";
+  document.querySelector('.desc').textContent = "Your birthday surprise is now unlocked! Opening your gift...";
+  launchConfetti();
+  setTimeout(function(){
+    window.location.reload();
+  }, 2500);
+}
+
+function copyGiftLink() {
+  const btn = document.getElementById('copyBtn');
+  navigator.clipboard.writeText(window.location.href.split('?')[0]);
+  btn.textContent = '✅ Saved!';
+  setTimeout(function(){ btn.textContent = '📋 Save Link'; }, 2000);
+}
+
+function downloadCalendarReminder() {
+  const title = "Open Birthday Gift for ${escapeHtml(recipient)}! 🎂";
+  const desc = "Your special birthday gift website is unlocked! Open it here: " + window.location.href.split('?')[0];
+  const dt = new Date(targetTime).toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+  const ics = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//2luv//Birthday Gift Reminder//EN',
+    'BEGIN:VEVENT',
+    'SUMMARY:' + title,
+    'DESCRIPTION:' + desc,
+    'URL:' + window.location.href.split('?')[0],
+    'DTSTART:' + dt,
+    'DTEND:' + dt,
+    'STATUS:CONFIRMED',
+    'BEGIN:VALARM',
+    'TRIGGER:-PT15M',
+    'ACTION:DISPLAY',
+    'DESCRIPTION:Birthday Gift Reminder',
+    'END:VALARM',
+    'END:VEVENT',
+    'END:VCALENDAR'
+  ].join('\\r\\n');
+
+  const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'birthday-surprise-reminder.ics';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+function launchConfetti() {
+  const canvas = document.getElementById('confettiCanvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  const particles = [];
+  const colors = ['#f43f5e', '#ec4899', '#a855f7', '#3b82f6', '#10b981', '#f59e0b'];
+  for (let i = 0; i < 150; i++) {
+    particles.push({
+      x: canvas.width / 2,
+      y: canvas.height / 2,
+      vx: (Math.random() - 0.5) * 16,
+      vy: (Math.random() - 0.7) * 16,
+      size: 5 + Math.random() * 5,
+      color: colors[Math.floor(Math.random() * colors.length)]
+    });
+  }
+  let frame = 0;
+  function render() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    particles.forEach(p => {
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.3;
+      ctx.fillStyle = p.color;
+      ctx.fillRect(p.x, p.y, p.size, p.size);
+    });
+    frame++;
+    if (frame < 120) requestAnimationFrame(render);
+  }
+  render();
+}
+</script>
+</body>
+</html>`;
+}
+
+function renderLetterShell(locale, link, letter, hostUrl = '', isPaymentSuccess = false) {
   const isPaid = Boolean(letter.paid === true || letter.isPaid === true);
   const recipient = letter.recipientName || 'My Love';
   const canonicalUrl = hostUrl ? (hostUrl + '/' + locale + '/letter/' + link) : ('/' + locale + '/letter/' + link);
   const publicSiteUrl = hostUrl || '';
   const orderId = letter.orderId || ('ORD-' + link);
   const paymentId = letter.paymentId || '';
-  const checkoutUrl = letter.checkoutUrl || (paymentId ? `${hostUrl}/checkout/${paymentId}` : `/checkout/`);
+  const checkoutUrl = `/pay?letter=${encodeURIComponent(link)}`;
   const upiIntentUri = `upi://pay?pa=${encodeURIComponent(UPI_ID)}&pn=${encodeURIComponent(PAYEE_NAME)}&am=${PRICE_INR}.00&cu=INR&tn=${encodeURIComponent(orderId)}`;
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiIntentUri)}`;
+  const qrUrl = `/api/qrcode?data=${encodeURIComponent(upiIntentUri)}`;
 
   const unpaidOverlayHtml = isPaid ? '' : `
 <div id="luvePayGate" style="position:fixed;inset:0;background:rgba(15,10,25,0.88);backdrop-filter:blur(8px);z-index:999999;display:flex;align-items:center;justify-content:center;padding:16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,sans-serif;">
-  <div style="background:#ffffff;color:#1e1e2f;border-radius:24px;max-width:440px;width:100%;box-shadow:0 25px 60px rgba(0,0,0,0.45);overflow:hidden;text-align:center;animation:luvePop 0.3s ease-out;">
-    <div style="background:linear-gradient(135deg,#e11d48,#be123c);padding:24px 20px;color:#fff;">
-      <div style="font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:0.9;">Luve gifts · Birthday Website</div>
-      <h2 style="margin:8px 0 4px;font-size:22px;font-weight:800;letter-spacing:-0.5px;">Unlock Gift for ${recipient}</h2>
-      <p style="margin:0;font-size:14px;opacity:0.95;">One-time payment of ₹${PRICE_INR} for permanent lifetime access</p>
+  <div style="background:#ffffff;color:#1e1e2f;border-radius:24px;max-width:440px;width:100%;box-shadow:0 25px 60px rgba(0,0,0,0.45);overflow:hidden;text-align:center;animation:luvePop 0.3s ease-out;max-height:92vh;overflow-y:auto;">
+    <div style="background:linear-gradient(135deg,#e11d48,#be123c);padding:20px 20px 16px;color:#fff;">
+      <div style="font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:0.9;">Luve Gifts · Birthday Website</div>
+      <h2 style="margin:6px 0 2px;font-size:22px;font-weight:800;letter-spacing:-0.5px;">Unlock Gift for ${recipient}</h2>
+      <p style="margin:0;font-size:13px;opacity:0.95;">Price: <strong id="luvePriceDisplay" style="font-size:16px;">₹${PRICE_INR}</strong> for permanent access</p>
     </div>
-    <div style="padding:22px 20px;">
-      <div style="background:#f8fafc;border:2px dashed #cbd5e1;border-radius:18px;padding:16px;display:inline-block;margin-bottom:14px;">
-        <img src="${qrUrl}" alt="Scan UPI QR" style="width:190px;height:190px;display:block;border-radius:8px;margin:0 auto;" />
-        <div style="margin-top:10px;font-size:13px;font-weight:700;color:#0f172a;">Scan with Any UPI App</div>
-        <div style="font-size:12px;color:#64748b;">GPay · PhonePe · Paytm · BHIM</div>
+    <div style="padding:18px 20px;">
+      <!-- Voucher / Promo Code Box -->
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:10px 12px;margin-bottom:12px;text-align:left;">
+        <div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px;">🎟️ Have a Promo Code / Voucher?</div>
+        <div style="display:flex;gap:6px;">
+          <input id="luvePromoCode" type="text" placeholder="e.g. FREEGIFT or LUVE50" style="flex:1;padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:12px;text-transform:uppercase;outline:none;font-weight:600;" />
+          <button type="button" id="luveApplyPromoBtn" onclick="applyLuvePromo()" style="background:#3b82f6;color:#fff;border:none;padding:8px 14px;border-radius:8px;font-weight:700;cursor:pointer;font-size:12px;">Apply</button>
+        </div>
+        <div id="luvePromoMsg" style="font-size:12px;margin-top:6px;display:none;font-weight:600;"></div>
       </div>
-      <div style="margin-bottom:14px;font-size:13px;color:#475569;">
+
+      <div style="background:#f8fafc;border:2px dashed #cbd5e1;border-radius:18px;padding:12px;display:inline-block;margin-bottom:12px;">
+        <img id="luveQrImg" src="${qrUrl}" alt="Scan UPI QR" style="width:170px;height:170px;display:block;border-radius:8px;margin:0 auto;" />
+        <div style="margin-top:8px;font-size:12px;font-weight:700;color:#0f172a;">Scan with Any UPI App</div>
+        <div style="font-size:11px;color:#64748b;">GPay · PhonePe · Paytm · BHIM</div>
+      </div>
+      <div style="margin-bottom:12px;font-size:12px;color:#475569;">
         Payee: <strong>${PAYEE_NAME}</strong> (<code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;color:#0f172a;font-weight:600;">${UPI_ID}</code>)
       </div>
-      <div style="display:flex;gap:10px;margin-bottom:16px;">
-        <a href="${upiIntentUri}" style="flex:1;background:#2563eb;color:#fff;text-decoration:none;font-weight:700;font-size:13px;padding:12px 8px;border-radius:12px;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 4px 12px rgba(37,99,235,0.3);">
+      <div style="display:flex;gap:10px;margin-bottom:14px;">
+        <a id="luvePayUpiBtn" href="${upiIntentUri}" style="flex:1;background:#2563eb;color:#fff;text-decoration:none;font-weight:700;font-size:13px;padding:10px 8px;border-radius:10px;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 4px 12px rgba(37,99,235,0.3);">
           ⚡ Pay via UPI App
         </a>
-        <a href="${checkoutUrl}" style="flex:1;background:#0f172a;color:#fff;text-decoration:none;font-weight:700;font-size:13px;padding:12px 8px;border-radius:12px;display:flex;align-items:center;justify-content:center;">
+        <a href="${checkoutUrl}" style="flex:1;background:#0f172a;color:#fff;text-decoration:none;font-weight:700;font-size:13px;padding:10px 8px;border-radius:10px;display:flex;align-items:center;justify-content:center;">
           Open Gateway
         </a>
       </div>
-      <div style="border-top:1px solid #e2e8f0;padding-top:14px;text-align:left;">
-        <label style="font-size:12px;font-weight:700;color:#475569;display:block;margin-bottom:6px;">Already paid? Enter 12-digit UPI Reference (UTR) number:</label>
+      <div style="border-top:1px solid #e2e8f0;padding-top:12px;text-align:left;">
+        <label style="font-size:11px;font-weight:700;color:#475569;display:block;margin-bottom:5px;">Already paid? Enter 12-digit UPI Reference (UTR) number:</label>
         <div style="display:flex;gap:8px;">
-          <input id="luveUtrInput" type="text" placeholder="e.g. 429381729182" maxlength="16" style="flex:1;padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:13px;outline:none;" />
-          <button id="luveVerifyBtn" onclick="verifyLuvePayment()" style="background:#16a34a;color:#fff;border:none;padding:10px 16px;border-radius:10px;font-weight:700;cursor:pointer;font-size:13px;">Verify</button>
+          <input id="luveUtrInput" type="text" placeholder="e.g. 429381729182" maxlength="20" style="flex:1;padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:12px;outline:none;" />
+          <button id="luveVerifyBtn" onclick="verifyLuvePayment()" style="background:#16a34a;color:#fff;border:none;padding:8px 14px;border-radius:8px;font-weight:700;cursor:pointer;font-size:12px;">Verify</button>
         </div>
         <div id="luveVerifyStatus" style="font-size:12px;margin-top:6px;color:#dc2626;display:none;"></div>
       </div>
@@ -1650,6 +2634,49 @@ function renderLetterShell(locale, link, letter, hostUrl = '') {
   </div>
 </div>
 <script>
+async function applyLuvePromo() {
+  const code = (document.getElementById('luvePromoCode').value || '').trim();
+  const msg = document.getElementById('luvePromoMsg');
+  const btn = document.getElementById('luveApplyPromoBtn');
+  if (!code) return;
+  btn.disabled = true;
+  btn.textContent = 'Applying...';
+  try {
+    const res = await fetch('/api/voucher/apply', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: code, letterRef: '${link}' })
+    });
+    const d = await res.json();
+    msg.style.display = 'block';
+    if (d.ok) {
+      msg.style.color = '#16a34a';
+      msg.textContent = d.message || 'Promo applied!';
+      if (d.unlocked) {
+        setTimeout(() => {
+          window.location.href = window.location.pathname + '?payment=success';
+        }, 800);
+        return;
+      }
+      const newPrice = d.finalPrice;
+      document.getElementById('luvePriceDisplay').textContent = '₹' + newPrice;
+      const newUri = 'upi://pay?pa=' + encodeURIComponent('${UPI_ID}') + '&pn=' + encodeURIComponent('${PAYEE_NAME}') + '&am=' + newPrice + '.00&cu=INR&tn=' + encodeURIComponent('${orderId}');
+      document.getElementById('luveQrImg').src = '/api/qrcode?data=' + encodeURIComponent(newUri);
+      document.getElementById('luvePayUpiBtn').href = newUri;
+    } else {
+      msg.style.color = '#dc2626';
+      msg.textContent = d.error || 'Invalid promo code.';
+    }
+  } catch(e) {
+    msg.style.display = 'block';
+    msg.style.color = '#dc2626';
+    msg.textContent = 'Error applying promo code.';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Apply';
+  }
+}
+
 async function verifyLuvePayment() {
   const btn = document.getElementById('luveVerifyBtn');
   const input = document.getElementById('luveUtrInput');
@@ -1694,20 +2721,40 @@ async function verifyLuvePayment() {
 }
 </script>`;
 
-  const paidCelebrationHtml = isPaid ? `
-<div id="luveShareBar" style="position:fixed;top:0;left:0;right:0;background:linear-gradient(90deg,#059669,#10b981);color:#fff;z-index:99999;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 4px 15px rgba(0,0,0,0.2);font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px;font-weight:600;">
-  <div>
-    🎉 <strong>Gift Unlocked &amp; Live!</strong> Share this private lifetime link with ${recipient}:
+  const paidCelebrationHtml = (isPaid && isPaymentSuccess) ? `
+<div id="luveShareBar" style="position:fixed;top:0;left:0;right:0;background:linear-gradient(90deg,#059669,#10b981);color:#fff;z-index:99999;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 4px 15px rgba(0,0,0,0.2);font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px;font-weight:600;animation:luvePop 0.3s ease;">
+  <div style="display:flex;align-items:center;gap:8px;">
+    <span>🎉</span>
+    <span><strong>Gift Unlocked!</strong> Share this link with ${recipient}:</span>
   </div>
-  <div style="display:flex;gap:8px;">
-    <button onclick="navigator.clipboard.writeText('${canonicalUrl}');alert('Private gift link copied to clipboard!');" style="background:#fff;color:#065f46;border:none;padding:6px 14px;border-radius:20px;font-weight:700;font-size:12px;cursor:pointer;">
+  <div style="display:flex;gap:8px;align-items:center;">
+    <button onclick="copyGiftLink(this)" style="background:#fff;color:#065f46;border:none;padding:6px 14px;border-radius:20px;font-weight:700;font-size:12px;cursor:pointer;">
       📋 Copy Link
     </button>
-    <a href="https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(canonicalUrl)}" target="_blank" style="background:#065f46;color:#fff;text-decoration:none;padding:6px 14px;border-radius:20px;font-weight:700;font-size:12px;">
+    <button onclick="downloadGiftQR('${canonicalUrl}')" style="background:#065f46;color:#fff;border:none;padding:6px 14px;border-radius:20px;font-weight:700;font-size:12px;cursor:pointer;">
       📲 Download QR
-    </a>
+    </button>
+    <button onclick="dismissShareBar()" title="Dismiss" style="background:rgba(0,0,0,0.2);color:#fff;border:none;width:26px;height:26px;border-radius:50%;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">✕</button>
   </div>
-</div>` : '';
+</div>
+<script>
+function dismissShareBar() {
+  var bar = document.getElementById('luveShareBar');
+  if (bar) bar.style.display = 'none';
+  if (window.history && window.history.replaceState) {
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
+}
+function copyGiftLink(btn) {
+  navigator.clipboard.writeText('${canonicalUrl}');
+  btn.textContent = '✅ Copied!';
+  setTimeout(function() { btn.textContent = '📋 Copy Link'; }, 2000);
+}
+function downloadGiftQR(giftUrl) {
+  window.location.href = '/api/download-qr?data=' + encodeURIComponent(giftUrl) + '&filename=gift-qr-code.png';
+}
+setTimeout(dismissShareBar, 12000);
+</script>` : '';
 
   return `<!doctype html>
 <html lang="${locale}-US" dir="ltr">
@@ -1730,6 +2777,10 @@ async function verifyLuvePayment() {
 <link rel="stylesheet" href="/_app/immutable/assets/PartyMusicStage.Dl_OQd4c.css">
 <style>
 @keyframes luvePop { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
+/* Clean gift receiver experience: Never show creator management or edit buttons to recipients */
+.more, .more *, .more.svelte-eyox5p, [data-testid="owner-actions"], [data-testid="owner-actions"] *, .letter-message__tools {
+  display: none !important;
+}
 </style>
 <script>
 (function(){try{var s=localStorage.getItem('theme');var t=(s==='light'||s==='dark'||s==='system')?s:'system';
@@ -1787,8 +2838,8 @@ ${paidCelebrationHtml}
                 },
                 dictionary: {},
                 initiallyOpen: false,
-                requiresPaymentUnlock: !(letter.paid === true || letter.isPaid === true),
-                showOwnerActions: true
+                requiresPaymentUnlock: ${!isPaid},
+                showOwnerActions: false
               },
               uses: {}
             }
@@ -1805,6 +2856,7 @@ ${unpaidOverlayHtml}
 
 function serveStaticFile(req, res, pathname) {
   let decoded = decodeURIComponent(pathname);
+  const search = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
   if (decoded === '/' || decoded === '') decoded = '/index.html';
 
   if (decoded === '/create' || decoded === '/create/' || decoded === '/create/index.html' || decoded === '/en/create' || decoded === '/en/create/') {
@@ -1819,6 +2871,13 @@ function serveStaticFile(req, res, pathname) {
     return res.end();
   }
 
+  // Short /l/ link redirect to /en/letter/
+  if (pathname.startsWith('/l/')) {
+    const slug = pathname.replace('/l/', '');
+    res.writeHead(301, { 'Location': `/en/letter/${slug}${search}` });
+    return res.end();
+  }
+
   // Dynamic Letter Pages
   const letterMatch = decoded.match(/^\/(?:([a-z]{2}(?:-[a-z]{2})?)\/)?letter\/([^\/\.]+)\/?$/i);
   if (letterMatch) {
@@ -1827,14 +2886,13 @@ function serveStaticFile(req, res, pathname) {
     const urlObj = new URL(req.url, 'http://localhost');
     const paymentSuccess = urlObj.searchParams.get('payment') === 'success';
 
-    let letter = letters[link] || Object.values(letters).find(l => l.shareableLink === link || l.id === link);
-    if (letter && paymentSuccess) {
-      letter.paid = true;
-      letter.isPaid = true;
-      letter.status = 'published';
-      saveLetters();
-    }
+    try {
+      if (fs.existsSync(LETTERS_FILE)) {
+        letters = JSON.parse(fs.readFileSync(LETTERS_FILE, 'utf8'));
+      }
+    } catch (e) {}
 
+    let letter = letters[link] || Object.values(letters).find(l => l.shareableLink === link || l.id === link);
     if (!letter) {
       letter = {
         id: 'letter-' + link,
@@ -1857,14 +2915,39 @@ function serveStaticFile(req, res, pathname) {
         photos: [],
         musicUrl: ''
       };
+      letters[link] = letter;
+      saveLetters();
+    }
+    if (paymentSuccess) {
+      letter.paid = true;
+      letter.isPaid = true;
+      letter.status = 'published';
+      saveLetters();
     }
     const proto = req.headers['x-forwarded-proto'] || 'http';
     const host = req.headers.host ? `${proto}://${req.headers.host}` : '';
-    const html = renderLetterShell(locale, link, letter, host);
+    const isPreview = urlObj.searchParams.get('preview') === 'true' || urlObj.searchParams.get('author') === 'true';
+
+    // Birthday Lock: Gift opens ONLY on the birthday date, otherwise countdown lock screen
+    const birthdayTarget = getLetterBirthdayDate(letter);
+    const now = new Date();
+    if (birthdayTarget && now.getTime() < birthdayTarget.getTime() && !paymentSuccess && !isPreview) {
+      const lockHtml = renderBirthdayLockPage(locale, link, letter, host, birthdayTarget);
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Content-Length': Buffer.byteLength(lockHtml),
+        'Cache-Control': 'no-cache',
+        'Set-Cookie': 'cookie-consent=accepted; Path=/; Max-Age=31536000; SameSite=Lax'
+      });
+      return res.end(lockHtml);
+    }
+
+    const html = renderLetterShell(locale, link, letter, host, paymentSuccess);
     res.writeHead(200, {
       'Content-Type': 'text/html; charset=utf-8',
       'Content-Length': Buffer.byteLength(html),
-      'Cache-Control': 'no-cache'
+      'Cache-Control': 'no-cache',
+      'Set-Cookie': 'cookie-consent=accepted; Path=/; Max-Age=31536000; SameSite=Lax'
     });
     return res.end(html);
   }
@@ -1931,6 +3014,13 @@ function serveStaticFile(req, res, pathname) {
     }
   }
 
+  if (filePath.endsWith('.avif')) {
+    const webpAlt = filePath.replace(/\.avif$/, '.webp');
+    if (fs.existsSync(webpAlt)) {
+      filePath = webpAlt;
+    }
+  }
+
   if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
     res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
     return res.end('File not found: ' + pathname);
@@ -1959,16 +3049,46 @@ function serveStaticFile(req, res, pathname) {
     stream.on('error', () => { if (!res.headersSent) res.writeHead(500); res.end(); });
     stream.pipe(res);
   } else {
-    res.writeHead(200, {
+    const headers = {
       'Content-Length': totalSize,
       'Content-Type': contentType,
       'Accept-Ranges': 'bytes',
       'Cache-Control': 'no-cache'
-    });
+    };
+    if (contentType && contentType.startsWith('text/html')) {
+      headers['Set-Cookie'] = 'cookie-consent=accepted; Path=/; Max-Age=31536000; SameSite=Lax';
+    }
+    res.writeHead(200, headers);
     const stream = fs.createReadStream(filePath);
     stream.on('error', () => { if (!res.headersSent) res.writeHead(500); res.end(); });
     stream.pipe(res);
   }
+}
+
+function serveUploadedFile(req, res, pathname) {
+  const filename = path.basename(pathname);
+  let filePath = path.join(UPLOADS_DIR, filename);
+  if (!fs.existsSync(filePath)) {
+    if (fs.existsSync(filePath + '.jpg')) filePath += '.jpg';
+    else if (fs.existsSync(filePath + '.png')) filePath += '.png';
+    else if (fs.existsSync(filePath + '.webp')) filePath += '.webp';
+  }
+
+  if (fs.existsSync(filePath) && !fs.statSync(filePath).isDirectory()) {
+    const ext = path.extname(filePath).toLowerCase();
+    const contentType = MIME_TYPES[ext] || 'image/jpeg';
+    const stat = fs.statSync(filePath);
+    res.writeHead(200, {
+      'Content-Type': contentType,
+      'Content-Length': stat.size,
+      'Cache-Control': 'public, max-age=31536000',
+      'Access-Control-Allow-Origin': '*'
+    });
+    return fs.createReadStream(filePath).pipe(res);
+  }
+
+  res.writeHead(404, { 'Content-Type': 'text/plain', 'Access-Control-Allow-Origin': '*' });
+  return res.end('Uploaded photo not found');
 }
 
 // 1. Primary Server on port 8900: Serves Static Assets + Handles /api/ Routes directly
@@ -2017,12 +3137,18 @@ const primaryServer = http.createServer((req, res) => {
   if (pathname === '/en/event/birthday/') {
     const enBirthdayPath = path.join(REPLICA_DIR, 'en', 'event', 'birthday', 'index.html');
     if (fs.existsSync(enBirthdayPath)) {
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Set-Cookie': 'cookie-consent=accepted; Path=/; Max-Age=31536000; SameSite=Lax'
+      });
       fs.createReadStream(enBirthdayPath).pipe(res);
       return;
     } else {
       const rootIndex = path.join(REPLICA_DIR, 'index.html');
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Set-Cookie': 'cookie-consent=accepted; Path=/; Max-Age=31536000; SameSite=Lax'
+      });
       fs.createReadStream(rootIndex).pipe(res);
       return;
     }
@@ -2098,6 +3224,13 @@ const primaryServer = http.createServer((req, res) => {
     return proxyToPort(req, res, YOUPI_CHECKOUT_PORT, req.url);
   }
 
+  if (pathname.startsWith('/uploads/') || pathname.startsWith('/__r2-part/uploads/')) {
+    if (req.method === 'GET' || req.method === 'HEAD') {
+      return serveUploadedFile(req, res, pathname);
+    }
+    return handleApiRequest(req, res, pathname);
+  }
+
   if (pathname.startsWith('/api/') || pathname.startsWith('/__r2-part/')) {
     return handleApiRequest(req, res, pathname);
   }
@@ -2125,6 +3258,9 @@ if (!process.env.RENDER && process.env.NODE_ENV !== 'production') {
   const stubServer = http.createServer((req, res) => {
     const url = new URL(req.url, `http://127.0.0.1:${API_PORT}`);
     const pathname = url.pathname;
+    if ((pathname.startsWith('/uploads/') || pathname.startsWith('/__r2-part/uploads/')) && (req.method === 'GET' || req.method === 'HEAD')) {
+      return serveUploadedFile(req, res, pathname);
+    }
     handleApiRequest(req, res, pathname);
   });
 
